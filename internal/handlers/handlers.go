@@ -31,7 +31,7 @@ func (h *Handlers) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 
 	metricValue, err := parseMetricValue(metricValueRaw)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid metric value (%s): %v", metricValueRaw, err.Error()), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("invalid metric value (%q): %v", metricValueRaw, err.Error()), http.StatusBadRequest)
 		return
 	}
 
