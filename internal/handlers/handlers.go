@@ -9,11 +9,11 @@ import (
 )
 
 type Handlers struct {
-	mStorage *storage.MemStorage
+	memStorage *storage.MemStorage
 }
 
-func NewHandlers(mStorage *storage.MemStorage) *Handlers {
-	return &Handlers{mStorage: mStorage}
+func NewHandlers(memStorage *storage.MemStorage) *Handlers {
+	return &Handlers{memStorage: memStorage}
 }
 
 func (h *Handlers) UpdateMetric(w http.ResponseWriter, r *http.Request) {
@@ -40,9 +40,9 @@ func (h *Handlers) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 
 	switch r.PathValue("metricType") {
 	case "counter":
-		h.mStorage.SetCounter(metricName, int64(metricValue))
+		h.memStorage.SetCounter(metricName, int64(metricValue))
 	case "gauge":
-		h.mStorage.SetGauge(metricName, metricValue)
+		h.memStorage.SetGauge(metricName, metricValue)
 	default:
 		http.Error(w, "invalid metric type", http.StatusBadRequest)
 

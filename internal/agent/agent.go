@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"log"
 	"time"
 
 	"github.com/andymarkow/go-metrics-collector/internal/monitor"
@@ -33,10 +32,8 @@ func (a *Agent) Start() error {
 	for {
 		select {
 		case <-pollTicket.C:
-			log.Println("pollTicket")
 			mon.Collect()
 		case <-reportTicker.C:
-			log.Println("reportTicker")
 			mon.Push()
 		}
 	}
