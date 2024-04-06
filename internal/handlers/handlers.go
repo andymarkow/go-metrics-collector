@@ -69,7 +69,7 @@ func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		metricValue = fmt.Sprintf("%f", val)
+		metricValue = fmt.Sprintf("%.3f", val)
 	}
 
 	w.Header().Set("content-type", "text/plain")
