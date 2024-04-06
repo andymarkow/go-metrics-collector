@@ -58,8 +58,11 @@ func NewMonitor() *Monitor {
 		NewPollCountMetric(),
 	)
 
+	client := httpclient.NewHTTPClient()
+	client.SetBaseURL("http://localhost:8080")
+
 	return &Monitor{
-		client:  httpclient.NewHTTPClient(),
+		client:  client,
 		memstat: &memstat,
 		metrics: metrics,
 	}
@@ -74,27 +77,22 @@ func (m *Monitor) Collect() {
 }
 
 func (m *Monitor) Push() {
-	addr := "http://localhost:8080"
-
 	for _, v := range m.metrics {
 		fmt.Println(v.GetName(), v.GetKind(), v.GetValueString())
 
-		url := fmt.Sprintf(
-			"%s/update/%s/%s/%s",
-			addr,
-			v.GetKind(),
-			v.GetName(),
-			v.GetValueString(),
-		)
+		resp, err := m.client.R().SetPathParams(map[string]string{
+			"metricType":  v.GetKind(),
+			"metricName":  v.GetName(),
+			"metricValue": v.GetValueString(),
+		}).SetHeader("Content-Type", "text/plain").
+			Post("/update/{metricType}/{metricName}/{metricValue}")
 
-		resp, err := m.client.Post(url, "text/plain", nil)
 		if err != nil {
-			log.Println("client.Post err:", err)
+			log.Println("client.Request:", err)
 
 			continue
 		}
-		defer resp.Body.Close()
 
-		fmt.Println(resp.Status)
+		fmt.Println(resp.Status())
 	}
 }

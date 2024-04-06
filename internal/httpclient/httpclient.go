@@ -1,11 +1,17 @@
 package httpclient
 
-import "net/http"
+import (
+	"github.com/go-resty/resty/v2"
+)
 
 type HTTPClient struct {
-	http.Client
+	*resty.Client
 }
 
 func NewHTTPClient() *HTTPClient {
-	return &HTTPClient{}
+	client := resty.New()
+
+	return &HTTPClient{
+		Client: client,
+	}
 }
