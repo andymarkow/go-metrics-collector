@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/andymarkow/go-metrics-collector/internal/monitor"
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
@@ -69,7 +70,9 @@ func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		metricValue = fmt.Sprintf("%.3f", val)
+		// Remove trailing zeros in string value to make check tests pass
+		// More info: https://github.com/andymarkow/go-metrics-collector/actions/runs/8584210095/job/23524237884#step:11:32
+		metricValue = strings.TrimRight(fmt.Sprintf("%f", val), "0")
 	}
 
 	w.Header().Set("content-type", "text/plain")
