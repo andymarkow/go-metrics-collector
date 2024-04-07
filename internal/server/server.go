@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -17,12 +18,15 @@ type Server struct {
 	srv *http.Server
 }
 
-func NewServer() *Server {
-	cfg := newConfig()
+func NewServer() (*Server, error) {
+	cfg, err := newConfig()
+	if err != nil {
+		return nil, fmt.Errorf("newConfig: %w", err)
+	}
 
-	memStorage := storage.NewStorage(storage.NewMemStorage())
+	strg := storage.NewStorage(storage.NewMemStorage())
 
-	h := handlers.NewHandlers(memStorage)
+	h := handlers.NewHandlers(strg)
 
 	r := chi.NewRouter()
 	r.Use(
@@ -48,10 +52,12 @@ func NewServer() *Server {
 
 	return &Server{
 		srv: srv,
-	}
+	}, nil
 }
 
 func (s *Server) Start() error {
+	log.Printf("Starting server on %q\n", s.srv.Addr)
+
 	if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server.ListenAndServe: %w", err)
 	}

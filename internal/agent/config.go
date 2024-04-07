@@ -2,7 +2,10 @@ package agent
 
 import (
 	"flag"
+	"fmt"
 	"strings"
+
+	"github.com/caarlos0/env"
 )
 
 type config struct {
@@ -11,7 +14,7 @@ type config struct {
 	ReportInterval int    `env:"REPORT_INTERVAL"`
 }
 
-func newConfig() config {
+func newConfig() (config, error) {
 	cfg := config{}
 
 	flag.StringVar(&cfg.ServerAddr, "a", "localhost:8080", "server endpoint address [env:ADDRESS]")
@@ -19,21 +22,15 @@ func newConfig() config {
 	flag.IntVar(&cfg.ReportInterval, "r", 10, "report interval in seconds [env:REPORT_INTERVAL]")
 	flag.Parse()
 
+	if err := env.Parse(&cfg); err != nil {
+		return cfg, fmt.Errorf("env.Parse: %w", err)
+	}
+
 	// Check if the URL does not start with "http://" or "https://"
 	if !strings.HasPrefix(cfg.ServerAddr, "http://") &&
 		!strings.HasPrefix(cfg.ServerAddr, "https://") {
 		cfg.ServerAddr = "http://" + cfg.ServerAddr
 	}
 
-	// if err := env.Parse(&cfg); err != nil {
-	// 	fmt.Printf("%+v\n", err)
-	// }
-
-	// fmt.Printf("serverAddr: %s\n", *serverAddr)
-	// fmt.Printf("pollInterval: %d\n", *pollInterval)
-	// fmt.Printf("reportInterval: %d\n", *reportInterval)
-
-	// fmt.Printf("cfg: %+v\n", cfg)
-
-	return cfg
+	return cfg, nil
 }
