@@ -8,7 +8,7 @@ import (
 	"github.com/andymarkow/go-metrics-collector/internal/httpclient"
 )
 
-type Collector interface {
+type metric interface {
 	Collect()
 	GetName() string
 	GetKind() string
@@ -18,44 +18,44 @@ type Collector interface {
 type Monitor struct {
 	client  *httpclient.HTTPClient
 	memstat *runtime.MemStats
-	metrics []Collector
+	metrics []metric
 }
 
 func NewMonitor() *Monitor {
 	var memstat runtime.MemStats
 
-	metrics := make([]Collector, 0)
+	metrics := make([]metric, 0)
 
 	metrics = append(metrics,
-		NewAllocMetric(&memstat),
-		NewBuckHashSysMetric(&memstat),
-		NewFreesMetric(&memstat),
-		NewGCCPUFractionMetric(&memstat),
-		NewGCSysMetric(&memstat),
-		NewHeapAllocMetric(&memstat),
-		NewHeapIdleMetric(&memstat),
-		NewHeapInuseMetric(&memstat),
-		NewHeapObjectsMetric(&memstat),
-		NewHeapReleasedMetric(&memstat),
-		NewHeapSysMetric(&memstat),
-		NewLastGCMetric(&memstat),
-		NewLookupsMetric(&memstat),
-		NewMCacheInuseMetric(&memstat),
-		NewMCacheSysMetric(&memstat),
-		NewMSpanInuseMetric(&memstat),
-		NewMSpanSysMetric(&memstat),
-		NewMallocsMetric(&memstat),
-		NewNextGCMetric(&memstat),
-		NewNumForcedGCMetric(&memstat),
-		NewNumGCMetric(&memstat),
-		NewOtherSysMetric(&memstat),
-		NewPauseTotalNsMetric(&memstat),
-		NewStackInuseMetric(&memstat),
-		NewStackSysMetric(&memstat),
-		NewSysMetric(&memstat),
-		NewTotalAllocMetric(&memstat),
-		NewRandomValueMetric(),
-		NewPollCountMetric(),
+		newAllocMetric(&memstat),
+		newBuckHashSysMetric(&memstat),
+		newFreesMetric(&memstat),
+		newGCCPUFractionMetric(&memstat),
+		newGCSysMetric(&memstat),
+		newHeapAllocMetric(&memstat),
+		newHeapIdleMetric(&memstat),
+		newHeapInuseMetric(&memstat),
+		newHeapObjectsMetric(&memstat),
+		newHeapReleasedMetric(&memstat),
+		newHeapSysMetric(&memstat),
+		newLastGCMetric(&memstat),
+		newLookupsMetric(&memstat),
+		newMCacheInuseMetric(&memstat),
+		newMCacheSysMetric(&memstat),
+		newMSpanInuseMetric(&memstat),
+		newMSpanSysMetric(&memstat),
+		newMallocsMetric(&memstat),
+		newNextGCMetric(&memstat),
+		newNumForcedGCMetric(&memstat),
+		newNumGCMetric(&memstat),
+		newOtherSysMetric(&memstat),
+		newPauseTotalNsMetric(&memstat),
+		newStackInuseMetric(&memstat),
+		newStackSysMetric(&memstat),
+		newSysMetric(&memstat),
+		newTotalAllocMetric(&memstat),
+		newRandomValueMetric(),
+		newPollCountMetric(),
 	)
 
 	client := httpclient.NewHTTPClient()
@@ -78,8 +78,6 @@ func (m *Monitor) Collect() {
 
 func (m *Monitor) Push() {
 	for _, v := range m.metrics {
-		fmt.Println(v.GetName(), v.GetKind(), v.GetValueString())
-
 		resp, err := m.client.R().SetPathParams(map[string]string{
 			"metricType":  v.GetKind(),
 			"metricName":  v.GetName(),

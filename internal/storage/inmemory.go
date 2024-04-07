@@ -1,23 +1,39 @@
 package storage
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
-// var _ Storage = (*MemStorage)(nil)
+var _ Storage = (*MemStorage)(nil)
+
+type memCounter struct {
+	data map[string]int64
+	mu   sync.RWMutex
+}
+
+type memGauge struct {
+	data map[string]float64
+	mu   sync.RWMutex
+}
 
 type MemStorage struct {
-	counters map[string]int64
-	gauges   map[string]float64
+	counter memCounter
+	gauge   memGauge
 }
 
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
-		counters: make(map[string]int64),
-		gauges:   make(map[string]float64),
+		counter: memCounter{data: make(map[string]int64)},
+		gauge:   memGauge{data: make(map[string]float64)},
 	}
 }
 
 func (s *MemStorage) GetCounter(key string) (int64, error) {
-	if v, ok := s.counters[key]; ok {
+	s.counter.mu.RLock()
+	defer s.counter.mu.RUnlock()
+
+	if v, ok := s.counter.data[key]; ok {
 		return v, nil
 	}
 
@@ -25,15 +41,21 @@ func (s *MemStorage) GetCounter(key string) (int64, error) {
 }
 
 func (s *MemStorage) SetCounter(key string, value int64) {
-	if v, ok := s.counters[key]; ok {
-		s.counters[key] = v + value
+	s.counter.mu.Lock()
+	defer s.counter.mu.Unlock()
+
+	if v, ok := s.counter.data[key]; ok {
+		s.counter.data[key] = v + value
 	} else {
-		s.counters[key] = value
+		s.counter.data[key] = value
 	}
 }
 
 func (s *MemStorage) GetGauge(key string) (float64, error) {
-	if v, ok := s.gauges[key]; ok {
+	s.gauge.mu.RLock()
+	defer s.gauge.mu.RUnlock()
+
+	if v, ok := s.gauge.data[key]; ok {
 		return v, nil
 	}
 
@@ -41,19 +63,28 @@ func (s *MemStorage) GetGauge(key string) (float64, error) {
 }
 
 func (s *MemStorage) SetGauge(key string, value float64) {
-	s.gauges[key] = value
+	s.gauge.mu.Lock()
+	defer s.gauge.mu.Unlock()
+
+	s.gauge.data[key] = value
 }
 
 func (s *MemStorage) GetAllMetrics() map[string]string {
 	all := make(map[string]string)
 
-	for k, v := range s.counters {
+	s.counter.mu.RLock()
+
+	for k, v := range s.counter.data {
 		all[k] = fmt.Sprintf("%d", v)
 	}
+	s.counter.mu.RUnlock()
 
-	for k, v := range s.gauges {
+	s.gauge.mu.RLock()
+
+	for k, v := range s.gauge.data {
 		all[k] = fmt.Sprintf("%f", v)
 	}
+	s.gauge.mu.RUnlock()
 
 	return all
 }

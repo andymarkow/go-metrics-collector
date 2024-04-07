@@ -39,9 +39,9 @@ func NewServer() *Server {
 	srv := &http.Server{
 		Addr:              "0.0.0.0:8080",
 		Handler:           r,
-		ReadTimeout:       60 * time.Second,
+		ReadTimeout:       30 * time.Second,
 		ReadHeaderTimeout: 10 * time.Second,
-		WriteTimeout:      60 * time.Second,
+		WriteTimeout:      30 * time.Second,
 	}
 
 	return &Server{
