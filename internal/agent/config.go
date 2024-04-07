@@ -14,9 +14,9 @@ type config struct {
 func newConfig() config {
 	cfg := config{}
 
-	flag.StringVar(&cfg.ServerAddr, "a", "localhost:8080", "server address")
-	flag.IntVar(&cfg.PollInterval, "p", 2, "poll interval")
-	flag.IntVar(&cfg.ReportInterval, "r", 10, "report interval")
+	flag.StringVar(&cfg.ServerAddr, "a", "localhost:8080", "server endpoint address [env:ADDRESS]")
+	flag.IntVar(&cfg.PollInterval, "p", 2, "poll interval in seconds [env:POLL_INTERVAL]")
+	flag.IntVar(&cfg.ReportInterval, "r", 10, "report interval in seconds [env:REPORT_INTERVAL]")
 	flag.Parse()
 
 	// Check if the URL does not start with "http://" or "https://"
