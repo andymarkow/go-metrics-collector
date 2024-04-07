@@ -65,6 +65,7 @@ func (s *Server) Start() error {
 	return nil
 }
 
+// metricValidatorMW is a router middleware that validates metric name and type.
 func metricValidatorMW(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		metricType := chi.URLParam(r, "metricType")
