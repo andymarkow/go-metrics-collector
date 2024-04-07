@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/andymarkow/go-metrics-collector/internal/monitor"
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
@@ -72,7 +71,7 @@ func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 
 		// Remove trailing zeros in string value to make check tests pass
 		// More info: https://github.com/andymarkow/go-metrics-collector/actions/runs/8584210095/job/23524237884#step:11:32
-		metricValue = strings.TrimRight(fmt.Sprintf("%f", val), "0")
+		metricValue = strconv.FormatFloat(val, 'f', -1, 64)
 	}
 
 	w.Header().Set("content-type", "text/plain")
@@ -90,7 +89,7 @@ func (h *Handlers) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metricValue, err := parseMetricValue(metricValueRaw)
+	metricValue, err := parseGaugeMetricValue(metricValueRaw)
 	if err != nil {
 		http.Error(w,
 			fmt.Sprintf("invalid metric value (%q): %v", metricValueRaw, err.Error()),
@@ -118,7 +117,7 @@ func (h *Handlers) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(http.StatusText(http.StatusOK)))
 }
 
-func parseMetricValue(s string) (float64, error) {
+func parseGaugeMetricValue(s string) (float64, error) {
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
 		return 0, fmt.Errorf("strconv.ParseFloat: %w", err)

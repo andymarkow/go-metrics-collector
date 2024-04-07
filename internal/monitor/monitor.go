@@ -1,7 +1,6 @@
 package monitor
 
 import (
-	"fmt"
 	"log"
 	"runtime"
 
@@ -21,7 +20,7 @@ type Monitor struct {
 	metrics []metric
 }
 
-func NewMonitor() *Monitor {
+func NewMonitor(serverAddr string) *Monitor {
 	var memstat runtime.MemStats
 
 	metrics := make([]metric, 0)
@@ -59,7 +58,7 @@ func NewMonitor() *Monitor {
 	)
 
 	client := httpclient.NewHTTPClient()
-	client.SetBaseURL("http://localhost:8080")
+	client.SetBaseURL(serverAddr)
 
 	return &Monitor{
 		client:  client,
@@ -78,7 +77,7 @@ func (m *Monitor) Collect() {
 
 func (m *Monitor) Push() {
 	for _, v := range m.metrics {
-		resp, err := m.client.R().SetPathParams(map[string]string{
+		_, err := m.client.R().SetPathParams(map[string]string{
 			"metricType":  v.GetKind(),
 			"metricName":  v.GetName(),
 			"metricValue": v.GetValueString(),
@@ -90,7 +89,5 @@ func (m *Monitor) Push() {
 
 			continue
 		}
-
-		fmt.Println(resp.Status())
 	}
 }
