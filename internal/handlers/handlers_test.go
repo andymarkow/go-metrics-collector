@@ -56,7 +56,7 @@ func TestParseGaugeMetricValue(t *testing.T) {
 }
 
 // TestGetAllMetrics tests the GetAllMetrics handler.
-func TestGetAllMetrics(t *testing.T) {
+func TestGetAllMetricsHandler(t *testing.T) {
 	type fields struct {
 		storage *storage.MemStorage
 	}
@@ -116,7 +116,7 @@ func TestGetAllMetrics(t *testing.T) {
 }
 
 // TestGetMetric tests the GetMetric handler.
-func TestGetMetric(t *testing.T) {
+func TestGetMetricHandler(t *testing.T) {
 	type want struct {
 		contentType string
 		statusCode  int
@@ -218,7 +218,7 @@ func TestGetMetric(t *testing.T) {
 }
 
 // TestUpdateMetric tests the UpdateMetric handler.
-func TestUpdateMetric(t *testing.T) {
+func TestUpdateMetricHandler(t *testing.T) {
 	type want struct {
 		contentType string
 		statusCode  int
@@ -322,7 +322,7 @@ func TestUpdateMetric(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req := newChiHTTPRequest(http.MethodPost, "/{metricType}/{metricName}/{metricValue}", map[string]string{
+			req := newChiHTTPRequest(http.MethodPost, "/update/{metricType}/{metricName}/{metricValue}", map[string]string{
 				"metricName":  tc.metric.name,
 				"metricType":  tc.metric.kind,
 				"metricValue": tc.metric.value,
