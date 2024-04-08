@@ -27,6 +27,11 @@ lint:
 
 test:
 	go clean -testcache
+	go test -v ./...
+
+coverage:
+	go clean -testcache
 	go test -v -cover -coverprofile=.coverage.cov ./...
-	go tool cover -func .coverage.cov
+	go tool cover -func=.coverage.cov
+	go tool cover -html=.coverage.cov
 	rm .coverage.cov
