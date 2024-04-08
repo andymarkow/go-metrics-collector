@@ -321,8 +321,8 @@ func TestUpdateMetric(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(_ *testing.T) {
-			req := newChiHTTPRequest(http.MethodPost, "/", map[string]string{
+		t.Run(tc.name, func(t *testing.T) {
+			req := newChiHTTPRequest(http.MethodPost, "/{metricType}/{metricName}/{metricValue}", map[string]string{
 				"metricName":  tc.metric.name,
 				"metricType":  tc.metric.kind,
 				"metricValue": tc.metric.value,
