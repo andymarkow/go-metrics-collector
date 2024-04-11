@@ -2,9 +2,10 @@
 package monitor
 
 import (
-	"fmt"
 	"math/rand"
 	"runtime"
+	"strconv"
+	"sync"
 )
 
 type MetricKind string
@@ -17,6 +18,7 @@ const (
 type baseMetric struct {
 	kind MetricKind
 	name string
+	mu   sync.Mutex
 }
 
 func (m *baseMetric) GetName() string {
@@ -42,7 +44,24 @@ func newCounterMetric(name string) CounterMetric {
 }
 
 func (m *CounterMetric) GetValueString() string {
-	return fmt.Sprintf("%d", m.value)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return strconv.FormatInt(m.value, 10)
+}
+
+func (m *CounterMetric) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.value++
+}
+
+func (m *CounterMetric) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.value = 0
 }
 
 type GaugeMetric struct {
@@ -60,7 +79,10 @@ func newGaugeMetric(name string) GaugeMetric {
 }
 
 func (m *GaugeMetric) GetValueString() string {
-	return fmt.Sprintf("%f", m.value)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return strconv.FormatFloat(m.value, 'f', -1, 64)
 }
 
 type MemStatsMetric struct {
@@ -119,6 +141,9 @@ func newAllocMetric(source *runtime.MemStats) *Alloc {
 }
 
 func (m *Alloc) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.Alloc)
 }
 
@@ -128,6 +153,9 @@ func newBuckHashSysMetric(source *runtime.MemStats) *BuckHashSys {
 }
 
 func (m *BuckHashSys) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.BuckHashSys)
 }
 
@@ -137,6 +165,9 @@ func newFreesMetric(source *runtime.MemStats) *Frees {
 }
 
 func (m *Frees) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.Frees)
 }
 
@@ -146,6 +177,9 @@ func newGCCPUFractionMetric(source *runtime.MemStats) *GCCPUFraction {
 }
 
 func (m *GCCPUFraction) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = m.source.GCCPUFraction
 }
 
@@ -155,6 +189,9 @@ func newGCSysMetric(source *runtime.MemStats) *GCSys {
 }
 
 func (m *GCSys) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.GCSys)
 }
 
@@ -164,6 +201,9 @@ func newHeapAllocMetric(source *runtime.MemStats) *HeapAlloc {
 }
 
 func (m *HeapAlloc) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.HeapAlloc)
 }
 
@@ -173,6 +213,9 @@ func newHeapIdleMetric(source *runtime.MemStats) *HeapIdle {
 }
 
 func (m *HeapIdle) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.HeapIdle)
 }
 
@@ -182,6 +225,9 @@ func newHeapInuseMetric(source *runtime.MemStats) *HeapInuse {
 }
 
 func (m *HeapInuse) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.HeapInuse)
 }
 
@@ -191,6 +237,9 @@ func newHeapObjectsMetric(source *runtime.MemStats) *HeapObjects {
 }
 
 func (m *HeapObjects) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.HeapObjects)
 }
 
@@ -200,6 +249,9 @@ func newHeapReleasedMetric(source *runtime.MemStats) *HeapReleased {
 }
 
 func (m *HeapReleased) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.HeapReleased)
 }
 
@@ -209,6 +261,9 @@ func newHeapSysMetric(source *runtime.MemStats) *HeapSys {
 }
 
 func (m *HeapSys) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.HeapSys)
 }
 
@@ -218,6 +273,9 @@ func newLastGCMetric(source *runtime.MemStats) *LastGC {
 }
 
 func (m *LastGC) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.LastGC)
 }
 
@@ -227,6 +285,9 @@ func newLookupsMetric(source *runtime.MemStats) *Lookups {
 }
 
 func (m *Lookups) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.Lookups)
 }
 
@@ -236,6 +297,9 @@ func newMCacheInuseMetric(source *runtime.MemStats) *MCacheInuse {
 }
 
 func (m *MCacheInuse) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.MCacheInuse)
 }
 
@@ -245,6 +309,9 @@ func newMCacheSysMetric(source *runtime.MemStats) *MCacheSys {
 }
 
 func (m *MCacheSys) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.MCacheSys)
 }
 
@@ -254,6 +321,9 @@ func newMSpanInuseMetric(source *runtime.MemStats) *MSpanInuse {
 }
 
 func (m *MSpanInuse) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.MSpanInuse)
 }
 
@@ -263,6 +333,9 @@ func newMSpanSysMetric(source *runtime.MemStats) *MSpanSys {
 }
 
 func (m *MSpanSys) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.MSpanSys)
 }
 
@@ -272,6 +345,9 @@ func newMallocsMetric(source *runtime.MemStats) *Mallocs {
 }
 
 func (m *Mallocs) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.Mallocs)
 }
 
@@ -281,6 +357,9 @@ func newNextGCMetric(source *runtime.MemStats) *NextGC {
 }
 
 func (m *NextGC) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.NextGC)
 }
 
@@ -290,6 +369,9 @@ func newNumForcedGCMetric(source *runtime.MemStats) *NumForcedGC {
 }
 
 func (m *NumForcedGC) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.NumForcedGC)
 }
 
@@ -299,6 +381,9 @@ func newNumGCMetric(source *runtime.MemStats) *NumGC {
 }
 
 func (m *NumGC) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.NumGC)
 }
 
@@ -308,6 +393,9 @@ func newOtherSysMetric(source *runtime.MemStats) *OtherSys {
 }
 
 func (m *OtherSys) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.OtherSys)
 }
 
@@ -317,6 +405,9 @@ func newPauseTotalNsMetric(source *runtime.MemStats) *PauseTotalNs {
 }
 
 func (m *PauseTotalNs) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.PauseTotalNs)
 }
 
@@ -326,6 +417,9 @@ func newStackInuseMetric(source *runtime.MemStats) *StackInuse {
 }
 
 func (m *StackInuse) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.StackInuse)
 }
 
@@ -335,6 +429,9 @@ func newStackSysMetric(source *runtime.MemStats) *StackSys {
 }
 
 func (m *StackSys) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.StackSys)
 }
 
@@ -344,6 +441,9 @@ func newSysMetric(source *runtime.MemStats) *Sys {
 }
 
 func (m *Sys) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.Sys)
 }
 
@@ -353,6 +453,9 @@ func newTotalAllocMetric(source *runtime.MemStats) *TotalAlloc {
 }
 
 func (m *TotalAlloc) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = float64(m.source.TotalAlloc)
 }
 
@@ -363,6 +466,9 @@ func newRandomValueMetric() *RandomValue {
 }
 
 func (m *RandomValue) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.value = rand.Float64() //nolint:gosec
 }
 
@@ -370,8 +476,4 @@ func newPollCountMetric() *PollCount {
 	return &PollCount{
 		CounterMetric: newCounterMetric("PollCount"),
 	}
-}
-
-func (m *PollCount) Collect() {
-	m.value++
 }
