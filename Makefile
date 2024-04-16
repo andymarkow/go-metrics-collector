@@ -6,12 +6,12 @@
 
 .EXPORT_ALL_VARIABLES:
 
-.PHONY: all lint validate docs build cloudbuild
+.PHONY: all
 
 all: fmt tidy
 
 fmt:
-	go fmt
+	go fmt ./...
 
 tidy:
 	go mod tidy
@@ -22,7 +22,11 @@ run-server:
 run-agent:
 	go run ./cmd/agent
 
+lint:
+	docker run --rm --name golangci-lint -v `pwd`:/workspace -w /workspace golangci/golangci-lint:latest-alpine golangci-lint run --issues-exit-code 1
+
 test:
-	go test -v -cover -coverprofile=profile.cov ./...
-	go tool cover -func profile.cov
-	rm profile.cov
+	go clean -testcache
+	go test -v -cover -coverprofile=.coverage.cov ./...
+	go tool cover -func .coverage.cov
+	rm .coverage.cov

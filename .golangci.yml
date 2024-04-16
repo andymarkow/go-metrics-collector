@@ -1,0 +1,109 @@
+# Options for analysis running.
+run:
+  timeout: 5m # Default: 1m
+  # skip-dirs:
+  #   - ""
+
+linters:
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - decorder
+    - dogsled
+    - dupl
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - exportloopref
+    # - forbidigo
+    - forcetypeassert
+    - gci
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - godox
+    - gofmt
+    - goheader
+    - goimports
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - gosmopolitan
+    - govet
+    - grouper
+    - importas
+    - ineffassign
+    - interfacebloat
+    - ireturn
+    - loggercheck
+    - makezero
+    - mirror
+    - misspell
+    - musttag
+    - nakedret
+    - nilerr
+    - nilnil
+    - nlreturn
+    - noctx
+    - nolintlint
+    - nonamedreturns
+    - nosprintfhostport
+    - paralleltest
+    - predeclared
+    - promlinter
+    - reassign
+    - revive
+    - sqlclosecheck
+    - staticcheck
+    - stylecheck
+    - tagliatelle
+    - tenv
+    - testpackage
+    - thelper
+    - tparallel
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - whitespace
+    - wrapcheck
+    - zerologlint
+
+  # Enable presets.
+  # https://golangci-lint.run/usage/linters
+  # presets:
+  #   - bugs
+  #   - error
+  #   - format
+  #   - style
+  #   - unused
+
+  # Disable specific linter
+  # https://golangci-lint.run/usage/linters/#disabled-by-default
+  # disable:
+  #   - exhaustruct
+  #   - depguard
+  #   - gochecknoglobals
+  #   - gochecknoinits
+  #   - gofumpt
+  #   - goerr113
+  #   - gomnd
+  #   - lll
+  #   - rowserrcheck
+  #   - tagalign
+  #   - varnamelen
+  #   - wastedassign
+  #   - wsl
