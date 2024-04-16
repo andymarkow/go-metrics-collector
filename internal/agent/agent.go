@@ -7,19 +7,23 @@ import (
 )
 
 type Agent struct {
+	serverAddr     string
 	pollInterval   time.Duration
 	reportInterval time.Duration
 }
 
 func NewAgent() *Agent {
+	cfg := newConfig()
+
 	return &Agent{
-		pollInterval:   2 * time.Second,
-		reportInterval: 10 * time.Second,
+		serverAddr:     cfg.ServerAddr,
+		pollInterval:   time.Duration(cfg.PollInterval) * time.Second,
+		reportInterval: time.Duration(cfg.ReportInterval) * time.Second,
 	}
 }
 
 func (a *Agent) Start() error {
-	mon := monitor.NewMonitor()
+	mon := monitor.NewMonitor(a.serverAddr)
 
 	pollTicket := time.NewTicker(a.pollInterval)
 	reportTicker := time.NewTicker(a.reportInterval)

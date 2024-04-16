@@ -18,6 +18,8 @@ type Server struct {
 }
 
 func NewServer() *Server {
+	cfg := newConfig()
+
 	memStorage := storage.NewStorage(storage.NewMemStorage())
 
 	h := handlers.NewHandlers(memStorage)
@@ -37,7 +39,7 @@ func NewServer() *Server {
 	})
 
 	srv := &http.Server{
-		Addr:              "0.0.0.0:8080",
+		Addr:              cfg.ServerAddr,
 		Handler:           r,
 		ReadTimeout:       30 * time.Second,
 		ReadHeaderTimeout: 10 * time.Second,
