@@ -24,7 +24,7 @@ linters:
     - exportloopref
     # - forbidigo
     - forcetypeassert
-    - gci
+    # - gci
     - ginkgolinter
     - gocheckcompilerdirectives
     - goconst
@@ -46,7 +46,7 @@ linters:
     - importas
     - ineffassign
     - interfacebloat
-    - ireturn
+    # - ireturn
     - loggercheck
     - makezero
     - mirror
@@ -60,7 +60,7 @@ linters:
     - nolintlint
     - nonamedreturns
     - nosprintfhostport
-    - paralleltest
+    # - paralleltest
     - predeclared
     - promlinter
     - reassign
@@ -70,7 +70,7 @@ linters:
     - stylecheck
     - tagliatelle
     - tenv
-    - testpackage
+    # - testpackage
     - thelper
     - tparallel
     - typecheck

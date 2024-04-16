@@ -31,10 +31,10 @@ func (a *Agent) Start() error {
 
 	for {
 		select {
-		case <-pollTicket.C:
-			mon.Collect()
 		case <-reportTicker.C:
 			mon.Push()
+		case <-pollTicket.C:
+			mon.Collect()
 		}
 	}
 }

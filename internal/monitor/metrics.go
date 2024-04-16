@@ -14,27 +14,27 @@ const (
 	MetricGauge   MetricKind = "gauge"
 )
 
-type Metric struct {
+type baseMetric struct {
 	kind MetricKind
 	name string
 }
 
-func (m *Metric) GetName() string {
+func (m *baseMetric) GetName() string {
 	return m.name
 }
 
-func (m *Metric) GetKind() string {
+func (m *baseMetric) GetKind() string {
 	return string(m.kind)
 }
 
 type CounterMetric struct {
-	Metric
+	baseMetric
 	value int64
 }
 
-func NewCounterMetric(name string) CounterMetric {
+func newCounterMetric(name string) CounterMetric {
 	return CounterMetric{
-		Metric: Metric{
+		baseMetric: baseMetric{
 			kind: MetricCounter,
 			name: name,
 		},
@@ -46,13 +46,13 @@ func (m *CounterMetric) GetValueString() string {
 }
 
 type GaugeMetric struct {
-	Metric
+	baseMetric
 	value float64
 }
 
-func NewGaugeMetric(name string) GaugeMetric {
+func newGaugeMetric(name string) GaugeMetric {
 	return GaugeMetric{
-		Metric: Metric{
+		baseMetric: baseMetric{
 			kind: MetricGauge,
 			name: name,
 		},
@@ -68,9 +68,9 @@ type MemStatsMetric struct {
 	source *runtime.MemStats
 }
 
-func NewMemStatsMetric(name string, source *runtime.MemStats) MemStatsMetric {
+func newMemStatsMetric(name string, source *runtime.MemStats) MemStatsMetric {
 	return MemStatsMetric{
-		GaugeMetric: NewGaugeMetric(name),
+		GaugeMetric: newGaugeMetric(name),
 		source:      source,
 	}
 }
@@ -113,8 +113,8 @@ type (
 	}
 )
 
-func NewAllocMetric(source *runtime.MemStats) *Alloc {
-	m := Alloc(NewMemStatsMetric("Alloc", source))
+func newAllocMetric(source *runtime.MemStats) *Alloc {
+	m := Alloc(newMemStatsMetric("Alloc", source))
 	return &m
 }
 
@@ -122,8 +122,8 @@ func (m *Alloc) Collect() {
 	m.value = float64(m.source.Alloc)
 }
 
-func NewBuckHashSysMetric(source *runtime.MemStats) *BuckHashSys {
-	m := BuckHashSys(NewMemStatsMetric("BuckHashSys", source))
+func newBuckHashSysMetric(source *runtime.MemStats) *BuckHashSys {
+	m := BuckHashSys(newMemStatsMetric("BuckHashSys", source))
 	return &m
 }
 
@@ -131,8 +131,8 @@ func (m *BuckHashSys) Collect() {
 	m.value = float64(m.source.BuckHashSys)
 }
 
-func NewFreesMetric(source *runtime.MemStats) *Frees {
-	m := Frees(NewMemStatsMetric("Frees", source))
+func newFreesMetric(source *runtime.MemStats) *Frees {
+	m := Frees(newMemStatsMetric("Frees", source))
 	return &m
 }
 
@@ -140,8 +140,8 @@ func (m *Frees) Collect() {
 	m.value = float64(m.source.Frees)
 }
 
-func NewGCCPUFractionMetric(source *runtime.MemStats) *GCCPUFraction {
-	m := GCCPUFraction(NewMemStatsMetric("GCCPUFraction", source))
+func newGCCPUFractionMetric(source *runtime.MemStats) *GCCPUFraction {
+	m := GCCPUFraction(newMemStatsMetric("GCCPUFraction", source))
 	return &m
 }
 
@@ -149,8 +149,8 @@ func (m *GCCPUFraction) Collect() {
 	m.value = m.source.GCCPUFraction
 }
 
-func NewGCSysMetric(source *runtime.MemStats) *GCSys {
-	m := GCSys(NewMemStatsMetric("GCSys", source))
+func newGCSysMetric(source *runtime.MemStats) *GCSys {
+	m := GCSys(newMemStatsMetric("GCSys", source))
 	return &m
 }
 
@@ -158,8 +158,8 @@ func (m *GCSys) Collect() {
 	m.value = float64(m.source.GCSys)
 }
 
-func NewHeapAllocMetric(source *runtime.MemStats) *HeapAlloc {
-	m := HeapAlloc(NewMemStatsMetric("HeapAlloc", source))
+func newHeapAllocMetric(source *runtime.MemStats) *HeapAlloc {
+	m := HeapAlloc(newMemStatsMetric("HeapAlloc", source))
 	return &m
 }
 
@@ -167,8 +167,8 @@ func (m *HeapAlloc) Collect() {
 	m.value = float64(m.source.HeapAlloc)
 }
 
-func NewHeapIdleMetric(source *runtime.MemStats) *HeapIdle {
-	m := HeapIdle(NewMemStatsMetric("HeapIdle", source))
+func newHeapIdleMetric(source *runtime.MemStats) *HeapIdle {
+	m := HeapIdle(newMemStatsMetric("HeapIdle", source))
 	return &m
 }
 
@@ -176,8 +176,8 @@ func (m *HeapIdle) Collect() {
 	m.value = float64(m.source.HeapIdle)
 }
 
-func NewHeapInuseMetric(source *runtime.MemStats) *HeapInuse {
-	m := HeapInuse(NewMemStatsMetric("HeapInuse", source))
+func newHeapInuseMetric(source *runtime.MemStats) *HeapInuse {
+	m := HeapInuse(newMemStatsMetric("HeapInuse", source))
 	return &m
 }
 
@@ -185,8 +185,8 @@ func (m *HeapInuse) Collect() {
 	m.value = float64(m.source.HeapInuse)
 }
 
-func NewHeapObjectsMetric(source *runtime.MemStats) *HeapObjects {
-	m := HeapObjects(NewMemStatsMetric("HeapObjects", source))
+func newHeapObjectsMetric(source *runtime.MemStats) *HeapObjects {
+	m := HeapObjects(newMemStatsMetric("HeapObjects", source))
 	return &m
 }
 
@@ -194,8 +194,8 @@ func (m *HeapObjects) Collect() {
 	m.value = float64(m.source.HeapObjects)
 }
 
-func NewHeapReleasedMetric(source *runtime.MemStats) *HeapReleased {
-	m := HeapReleased(NewMemStatsMetric("HeapReleased", source))
+func newHeapReleasedMetric(source *runtime.MemStats) *HeapReleased {
+	m := HeapReleased(newMemStatsMetric("HeapReleased", source))
 	return &m
 }
 
@@ -203,8 +203,8 @@ func (m *HeapReleased) Collect() {
 	m.value = float64(m.source.HeapReleased)
 }
 
-func NewHeapSysMetric(source *runtime.MemStats) *HeapSys {
-	m := HeapSys(NewMemStatsMetric("HeapSys", source))
+func newHeapSysMetric(source *runtime.MemStats) *HeapSys {
+	m := HeapSys(newMemStatsMetric("HeapSys", source))
 	return &m
 }
 
@@ -212,8 +212,8 @@ func (m *HeapSys) Collect() {
 	m.value = float64(m.source.HeapSys)
 }
 
-func NewLastGCMetric(source *runtime.MemStats) *LastGC {
-	m := LastGC(NewMemStatsMetric("LastGC", source))
+func newLastGCMetric(source *runtime.MemStats) *LastGC {
+	m := LastGC(newMemStatsMetric("LastGC", source))
 	return &m
 }
 
@@ -221,8 +221,8 @@ func (m *LastGC) Collect() {
 	m.value = float64(m.source.LastGC)
 }
 
-func NewLookupsMetric(source *runtime.MemStats) *Lookups {
-	m := Lookups(NewMemStatsMetric("Lookups", source))
+func newLookupsMetric(source *runtime.MemStats) *Lookups {
+	m := Lookups(newMemStatsMetric("Lookups", source))
 	return &m
 }
 
@@ -230,8 +230,8 @@ func (m *Lookups) Collect() {
 	m.value = float64(m.source.Lookups)
 }
 
-func NewMCacheInuseMetric(source *runtime.MemStats) *MCacheInuse {
-	m := MCacheInuse(NewMemStatsMetric("MCacheInuse", source))
+func newMCacheInuseMetric(source *runtime.MemStats) *MCacheInuse {
+	m := MCacheInuse(newMemStatsMetric("MCacheInuse", source))
 	return &m
 }
 
@@ -239,8 +239,8 @@ func (m *MCacheInuse) Collect() {
 	m.value = float64(m.source.MCacheInuse)
 }
 
-func NewMCacheSysMetric(source *runtime.MemStats) *MCacheSys {
-	m := MCacheSys(NewMemStatsMetric("MCacheSys", source))
+func newMCacheSysMetric(source *runtime.MemStats) *MCacheSys {
+	m := MCacheSys(newMemStatsMetric("MCacheSys", source))
 	return &m
 }
 
@@ -248,8 +248,8 @@ func (m *MCacheSys) Collect() {
 	m.value = float64(m.source.MCacheSys)
 }
 
-func NewMSpanInuseMetric(source *runtime.MemStats) *MSpanInuse {
-	m := MSpanInuse(NewMemStatsMetric("MSpanInuse", source))
+func newMSpanInuseMetric(source *runtime.MemStats) *MSpanInuse {
+	m := MSpanInuse(newMemStatsMetric("MSpanInuse", source))
 	return &m
 }
 
@@ -257,8 +257,8 @@ func (m *MSpanInuse) Collect() {
 	m.value = float64(m.source.MSpanInuse)
 }
 
-func NewMSpanSysMetric(source *runtime.MemStats) *MSpanSys {
-	m := MSpanSys(NewMemStatsMetric("MSpanSys", source))
+func newMSpanSysMetric(source *runtime.MemStats) *MSpanSys {
+	m := MSpanSys(newMemStatsMetric("MSpanSys", source))
 	return &m
 }
 
@@ -266,8 +266,8 @@ func (m *MSpanSys) Collect() {
 	m.value = float64(m.source.MSpanSys)
 }
 
-func NewMallocsMetric(source *runtime.MemStats) *Mallocs {
-	m := Mallocs(NewMemStatsMetric("Mallocs", source))
+func newMallocsMetric(source *runtime.MemStats) *Mallocs {
+	m := Mallocs(newMemStatsMetric("Mallocs", source))
 	return &m
 }
 
@@ -275,8 +275,8 @@ func (m *Mallocs) Collect() {
 	m.value = float64(m.source.Mallocs)
 }
 
-func NewNextGCMetric(source *runtime.MemStats) *NextGC {
-	m := NextGC(NewMemStatsMetric("NextGC", source))
+func newNextGCMetric(source *runtime.MemStats) *NextGC {
+	m := NextGC(newMemStatsMetric("NextGC", source))
 	return &m
 }
 
@@ -284,8 +284,8 @@ func (m *NextGC) Collect() {
 	m.value = float64(m.source.NextGC)
 }
 
-func NewNumForcedGCMetric(source *runtime.MemStats) *NumForcedGC {
-	m := NumForcedGC(NewMemStatsMetric("NumForcedGC", source))
+func newNumForcedGCMetric(source *runtime.MemStats) *NumForcedGC {
+	m := NumForcedGC(newMemStatsMetric("NumForcedGC", source))
 	return &m
 }
 
@@ -293,8 +293,8 @@ func (m *NumForcedGC) Collect() {
 	m.value = float64(m.source.NumForcedGC)
 }
 
-func NewNumGCMetric(source *runtime.MemStats) *NumGC {
-	m := NumGC(NewMemStatsMetric("NumGC", source))
+func newNumGCMetric(source *runtime.MemStats) *NumGC {
+	m := NumGC(newMemStatsMetric("NumGC", source))
 	return &m
 }
 
@@ -302,8 +302,8 @@ func (m *NumGC) Collect() {
 	m.value = float64(m.source.NumGC)
 }
 
-func NewOtherSysMetric(source *runtime.MemStats) *OtherSys {
-	m := OtherSys(NewMemStatsMetric("OtherSys", source))
+func newOtherSysMetric(source *runtime.MemStats) *OtherSys {
+	m := OtherSys(newMemStatsMetric("OtherSys", source))
 	return &m
 }
 
@@ -311,8 +311,8 @@ func (m *OtherSys) Collect() {
 	m.value = float64(m.source.OtherSys)
 }
 
-func NewPauseTotalNsMetric(source *runtime.MemStats) *PauseTotalNs {
-	m := PauseTotalNs(NewMemStatsMetric("PauseTotalNs", source))
+func newPauseTotalNsMetric(source *runtime.MemStats) *PauseTotalNs {
+	m := PauseTotalNs(newMemStatsMetric("PauseTotalNs", source))
 	return &m
 }
 
@@ -320,8 +320,8 @@ func (m *PauseTotalNs) Collect() {
 	m.value = float64(m.source.PauseTotalNs)
 }
 
-func NewStackInuseMetric(source *runtime.MemStats) *StackInuse {
-	m := StackInuse(NewMemStatsMetric("StackInuse", source))
+func newStackInuseMetric(source *runtime.MemStats) *StackInuse {
+	m := StackInuse(newMemStatsMetric("StackInuse", source))
 	return &m
 }
 
@@ -329,8 +329,8 @@ func (m *StackInuse) Collect() {
 	m.value = float64(m.source.StackInuse)
 }
 
-func NewStackSysMetric(source *runtime.MemStats) *StackSys {
-	m := StackSys(NewMemStatsMetric("StackSys", source))
+func newStackSysMetric(source *runtime.MemStats) *StackSys {
+	m := StackSys(newMemStatsMetric("StackSys", source))
 	return &m
 }
 
@@ -338,8 +338,8 @@ func (m *StackSys) Collect() {
 	m.value = float64(m.source.StackSys)
 }
 
-func NewSysMetric(source *runtime.MemStats) *Sys {
-	m := Sys(NewMemStatsMetric("Sys", source))
+func newSysMetric(source *runtime.MemStats) *Sys {
+	m := Sys(newMemStatsMetric("Sys", source))
 	return &m
 }
 
@@ -347,8 +347,8 @@ func (m *Sys) Collect() {
 	m.value = float64(m.source.Sys)
 }
 
-func NewTotalAllocMetric(source *runtime.MemStats) *TotalAlloc {
-	m := TotalAlloc(NewMemStatsMetric("TotalAlloc", source))
+func newTotalAllocMetric(source *runtime.MemStats) *TotalAlloc {
+	m := TotalAlloc(newMemStatsMetric("TotalAlloc", source))
 	return &m
 }
 
@@ -356,9 +356,9 @@ func (m *TotalAlloc) Collect() {
 	m.value = float64(m.source.TotalAlloc)
 }
 
-func NewRandomValueMetric() *RandomValue {
+func newRandomValueMetric() *RandomValue {
 	return &RandomValue{
-		GaugeMetric: NewGaugeMetric("RandomValue"),
+		GaugeMetric: newGaugeMetric("RandomValue"),
 	}
 }
 
@@ -366,9 +366,9 @@ func (m *RandomValue) Collect() {
 	m.value = rand.Float64() //nolint:gosec
 }
 
-func NewPollCountMetric() *PollCount {
+func newPollCountMetric() *PollCount {
 	return &PollCount{
-		CounterMetric: NewCounterMetric("PollCount"),
+		CounterMetric: newCounterMetric("PollCount"),
 	}
 }
 

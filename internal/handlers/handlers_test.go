@@ -10,7 +10,7 @@ import (
 
 func TestHandlers_UpdateMetric(t *testing.T) {
 	type fields struct {
-		memStorage *storage.MemStorage
+		storage *storage.MemStorage
 	}
 
 	type want struct {
@@ -28,7 +28,7 @@ func TestHandlers_UpdateMetric(t *testing.T) {
 			name:    "test",
 			urlPath: "/update/counter/test/1",
 			fields: fields{
-				memStorage: &storage.MemStorage{},
+				storage: &storage.MemStorage{},
 			},
 			want: want{
 				contentType: "text/plain",
@@ -38,9 +38,9 @@ func TestHandlers_UpdateMetric(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			h := &Handlers{
-				memStorage: tt.fields.memStorage,
+				storage: tt.fields.storage,
 			}
 
 			request := httptest.NewRequest(http.MethodPost, tt.urlPath, nil)
