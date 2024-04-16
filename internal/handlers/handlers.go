@@ -13,6 +13,13 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+var (
+	ErrMetricInvalidType  = errors.New("invalid metric type")
+	ErrMetricInvalidValue = errors.New("invalid metric value")
+	ErrMetricEmptyName    = errors.New("empty metric name")
+	ErrMetricEmptyValue   = errors.New("empty metric value")
+)
+
 type Handlers struct {
 	storage storage.Storage
 }
@@ -33,7 +40,7 @@ func (h *Handlers) GetAllMetrics(w http.ResponseWriter, _ *http.Request) {
 func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 	metricName := chi.URLParam(r, "metricName")
 	if metricName == "" {
-		http.Error(w, "empty metric name", http.StatusNotFound)
+		http.Error(w, ErrMetricEmptyName.Error(), http.StatusNotFound)
 
 		return
 	}
@@ -72,6 +79,11 @@ func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 		// Remove trailing zeros in string value to make check tests pass
 		// More info: https://github.com/andymarkow/go-metrics-collector/actions/runs/8584210095/job/23524237884#step:11:32
 		metricValue = strconv.FormatFloat(val, 'f', -1, 64)
+
+	default:
+		http.Error(w, ErrMetricInvalidType.Error(), http.StatusBadRequest)
+
+		return
 	}
 
 	w.Header().Set("content-type", "text/plain")
@@ -84,17 +96,14 @@ func (h *Handlers) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 
 	metricValueRaw := chi.URLParam(r, "metricValue")
 	if metricValueRaw == "" {
-		http.Error(w, "empty metric value", http.StatusBadRequest)
+		http.Error(w, ErrMetricEmptyValue.Error(), http.StatusBadRequest)
 
 		return
 	}
 
 	metricValue, err := parseGaugeMetricValue(metricValueRaw)
 	if err != nil {
-		http.Error(w,
-			fmt.Sprintf("invalid metric value (%q): %v", metricValueRaw, err.Error()),
-			http.StatusBadRequest,
-		)
+		http.Error(w, ErrMetricInvalidValue.Error(), http.StatusBadRequest)
 
 		return
 	}
@@ -107,7 +116,7 @@ func (h *Handlers) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 	case string(monitor.MetricGauge):
 		h.storage.SetGauge(metricName, metricValue)
 	default:
-		http.Error(w, "invalid metric type", http.StatusBadRequest)
+		http.Error(w, ErrMetricInvalidType.Error(), http.StatusBadRequest)
 
 		return
 	}

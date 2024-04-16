@@ -14,6 +14,10 @@ type metric interface {
 	GetValueString() string
 }
 
+type reseter interface {
+	Reset()
+}
+
 type Monitor struct {
 	client  *httpclient.HTTPClient
 	memstat *runtime.MemStats
@@ -88,6 +92,10 @@ func (m *Monitor) Push() {
 			log.Println("client.Request:", err)
 
 			continue
+		}
+
+		if c, ok := v.(reseter); ok {
+			c.Reset()
 		}
 	}
 }

@@ -1,10 +1,19 @@
 package main
 
-import "github.com/andymarkow/go-metrics-collector/internal/server"
+import (
+	"fmt"
+	"log"
+
+	"github.com/andymarkow/go-metrics-collector/internal/server"
+)
 
 func main() {
-	srv := server.NewServer()
+	srv, err := server.NewServer()
+	if err != nil {
+		log.Fatal(fmt.Errorf("server.NewServer: %w", err))
+	}
+
 	if err := srv.Start(); err != nil {
-		panic(err)
+		log.Fatal(fmt.Errorf("server.Start: %w", err))
 	}
 }

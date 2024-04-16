@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -17,17 +18,14 @@ type Server struct {
 	srv *http.Server
 }
 
-func NewServer() *Server {
-	cfg := newConfig()
-
-	memStorage := storage.NewStorage(storage.NewMemStorage())
-
-	h := handlers.NewHandlers(memStorage)
+func newRouter(strg storage.Storage) chi.Router {
+	h := handlers.NewHandlers(strg)
 
 	r := chi.NewRouter()
 	r.Use(
 		middleware.Logger,
 		middleware.Recoverer,
+		middleware.StripSlashes,
 	)
 
 	r.Get("/", h.GetAllMetrics)
@@ -37,6 +35,19 @@ func NewServer() *Server {
 		r.Get("/value/{metricType}/{metricName}", h.GetMetric)
 		r.Post("/update/{metricType}/{metricName}/{metricValue}", h.UpdateMetric)
 	})
+
+	return r
+}
+
+func NewServer() (*Server, error) {
+	cfg, err := newConfig()
+	if err != nil {
+		return nil, fmt.Errorf("newConfig: %w", err)
+	}
+
+	strg := storage.NewStorage(storage.NewMemStorage())
+
+	r := newRouter(strg)
 
 	srv := &http.Server{
 		Addr:              cfg.ServerAddr,
@@ -48,10 +59,12 @@ func NewServer() *Server {
 
 	return &Server{
 		srv: srv,
-	}
+	}, nil
 }
 
 func (s *Server) Start() error {
+	log.Printf("Starting server on %q\n", s.srv.Addr)
+
 	if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server.ListenAndServe: %w", err)
 	}
@@ -59,6 +72,7 @@ func (s *Server) Start() error {
 	return nil
 }
 
+// metricValidatorMW is a router middleware that validates metric name and type.
 func metricValidatorMW(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		metricType := chi.URLParam(r, "metricType")
@@ -66,14 +80,14 @@ func metricValidatorMW(next http.Handler) http.Handler {
 		switch metricType {
 		case string(monitor.MetricCounter), string(monitor.MetricGauge):
 		default:
-			http.Error(w, "invalid metric type", http.StatusBadRequest)
+			http.Error(w, handlers.ErrMetricInvalidType.Error(), http.StatusBadRequest)
 
 			return
 		}
 
 		metricName := chi.URLParam(r, "metricName")
 		if metricName == "" {
-			http.Error(w, "empty metric name", http.StatusNotFound)
+			http.Error(w, handlers.ErrMetricEmptyName.Error(), http.StatusNotFound)
 
 			return
 		}
