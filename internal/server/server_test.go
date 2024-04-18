@@ -10,6 +10,7 @@ import (
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestMetricValidatorMW(t *testing.T) {
@@ -53,7 +54,10 @@ func TestMetricValidatorMW(t *testing.T) {
 func TestRouter(t *testing.T) {
 	strg := storage.NewMemStorage()
 
-	router := newRouter(strg)
+	router := newRouter(&routerConfig{
+		storage: strg,
+		logger:  zap.NewNop(), // disable logging
+	})
 
 	ts := httptest.NewServer(router)
 	defer ts.Close()

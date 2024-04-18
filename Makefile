@@ -8,7 +8,7 @@
 
 .PHONY: all
 
-all: fmt tidy
+all: fmt tidy test lint
 
 fmt:
 	go fmt ./...
@@ -23,7 +23,8 @@ run-agent:
 	go run ./cmd/agent
 
 lint:
-	docker run --rm --name golangci-lint -v `pwd`:/workspace -w /workspace golangci/golangci-lint:latest-alpine golangci-lint run --issues-exit-code 1
+	docker run --rm --name golangci-lint -v `pwd`:/workspace -w /workspace \
+		golangci/golangci-lint:latest-alpine golangci-lint run --issues-exit-code 1
 
 test:
 	go clean -testcache
