@@ -177,19 +177,17 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 		h.storage.SetCounter(metricPayload.ID, int64(*metricPayload.Delta))
 
-		intVal, err := h.storage.GetCounter(metricPayload.ID)
+		val, err := h.storage.GetCounter(metricPayload.ID)
 		if err != nil {
 			h.handleError(w, err, http.StatusInternalServerError)
 
 			return
 		}
 
-		floatVal := float64(intVal)
-
 		metricResult = models.Metrics{
 			ID:    metricPayload.ID,
 			MType: metricPayload.MType,
-			Value: &floatVal,
+			Delta: &val,
 		}
 
 	case string(monitor.MetricGauge):
@@ -249,7 +247,7 @@ func (h *Handlers) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	switch metricPayload.MType {
 	case string(monitor.MetricCounter):
-		intVal, err := h.storage.GetCounter(metricPayload.ID)
+		val, err := h.storage.GetCounter(metricPayload.ID)
 		if errors.Is(err, storage.ErrMetricNotFound) {
 			h.handleError(w, err, http.StatusNotFound)
 
@@ -260,12 +258,10 @@ func (h *Handlers) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		floatVal := float64(intVal)
-
 		metricResult = models.Metrics{
 			ID:    metricPayload.ID,
 			MType: metricPayload.MType,
-			Value: &floatVal,
+			Delta: &val,
 		}
 
 	case string(monitor.MetricGauge):
