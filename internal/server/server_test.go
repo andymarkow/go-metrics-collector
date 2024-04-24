@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/andymarkow/go-metrics-collector/internal/handlers"
+	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -164,7 +164,7 @@ func TestRouter(t *testing.T) {
 			want: want{
 				contentType:  "text/plain; charset=utf-8",
 				statusCode:   http.StatusBadRequest,
-				response:     handlers.ErrMetricInvalidType.Error() + "\n",
+				response:     errormsg.ErrMetricInvalidType.Error() + "\n",
 				wantResponse: true,
 			},
 		},

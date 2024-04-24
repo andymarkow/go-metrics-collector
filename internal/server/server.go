@@ -26,7 +26,7 @@ type routerConfig struct {
 }
 
 func newRouter(cfg *routerConfig) chi.Router {
-	h := handlers.NewHandlers(cfg.storage)
+	h := handlers.NewHandlers(cfg.storage, cfg.logger)
 
 	mw := middlewares.New(&middlewares.Config{
 		Logger: cfg.logger,
@@ -45,6 +45,11 @@ func newRouter(cfg *routerConfig) chi.Router {
 		r.Use(mw.MetricValidator)
 		r.Get("/value/{metricType}/{metricName}", h.GetMetric)
 		r.Post("/update/{metricType}/{metricName}/{metricValue}", h.UpdateMetric)
+	})
+
+	r.Group(func(r chi.Router) {
+		r.Post("/update", h.UpdateMetricJSON)
+		r.Post("/value", h.GetMetricJSON)
 	})
 
 	return r

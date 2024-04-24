@@ -4,6 +4,7 @@ import (
 	"runtime"
 
 	"github.com/andymarkow/go-metrics-collector/internal/httpclient"
+	"github.com/andymarkow/go-metrics-collector/internal/models"
 	"go.uber.org/zap"
 )
 
@@ -11,6 +12,7 @@ type metric interface {
 	Collect()
 	GetName() string
 	GetKind() string
+	GetValue() any
 	GetValueString() string
 }
 
@@ -94,6 +96,49 @@ func (m *Monitor) Push() {
 			"metricValue": v.GetValueString(),
 		}).SetHeader("Content-Type", "text/plain").
 			Post("/update/{metricType}/{metricName}/{metricValue}")
+
+		if err != nil {
+			m.log.Error("client.Request: " + err.Error())
+
+			continue
+		}
+
+		if c, ok := v.(reseter); ok {
+			c.Reset()
+		}
+	}
+}
+
+func (m *Monitor) PushJSON() {
+	for _, v := range m.metrics {
+		var payload models.Metrics
+
+		switch v.GetKind() {
+		case string(MetricCounter):
+			val := v.GetValue().(int64)
+
+			payload = models.Metrics{
+				ID:    v.GetName(),
+				MType: v.GetKind(),
+				Delta: &val,
+			}
+
+		case string(MetricGauge):
+			val := v.GetValue().(float64)
+
+			payload = models.Metrics{
+				ID:    v.GetName(),
+				MType: v.GetKind(),
+				Value: &val,
+			}
+		}
+
+		m.log.Sugar().Debug("payload: ", payload)
+
+		_, err := m.client.R().
+			SetHeader("Content-Type", "application/json").
+			SetBody(payload).
+			Post("/update")
 
 		if err != nil {
 			m.log.Error("client.Request: " + err.Error())

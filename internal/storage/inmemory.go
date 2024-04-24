@@ -29,44 +29,44 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
-func (s *MemStorage) GetCounter(key string) (int64, error) {
+func (s *MemStorage) GetCounter(name string) (int64, error) {
 	s.counter.mu.RLock()
 	defer s.counter.mu.RUnlock()
 
-	if v, ok := s.counter.data[key]; ok {
+	if v, ok := s.counter.data[name]; ok {
 		return v, nil
 	}
 
 	return 0, ErrMetricNotFound
 }
 
-func (s *MemStorage) SetCounter(key string, value int64) {
+func (s *MemStorage) SetCounter(name string, value int64) {
 	s.counter.mu.Lock()
 	defer s.counter.mu.Unlock()
 
-	if v, ok := s.counter.data[key]; ok {
-		s.counter.data[key] = v + value
+	if v, ok := s.counter.data[name]; ok {
+		s.counter.data[name] = v + value
 	} else {
-		s.counter.data[key] = value
+		s.counter.data[name] = value
 	}
 }
 
-func (s *MemStorage) GetGauge(key string) (float64, error) {
+func (s *MemStorage) GetGauge(name string) (float64, error) {
 	s.gauge.mu.RLock()
 	defer s.gauge.mu.RUnlock()
 
-	if v, ok := s.gauge.data[key]; ok {
+	if v, ok := s.gauge.data[name]; ok {
 		return v, nil
 	}
 
 	return 0, ErrMetricNotFound
 }
 
-func (s *MemStorage) SetGauge(key string, value float64) {
+func (s *MemStorage) SetGauge(name string, value float64) {
 	s.gauge.mu.Lock()
 	defer s.gauge.mu.Unlock()
 
-	s.gauge.data[key] = value
+	s.gauge.data[name] = value
 }
 
 func (s *MemStorage) GetAllMetrics() map[string]string {
