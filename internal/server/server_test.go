@@ -184,6 +184,8 @@ func TestRouter(t *testing.T) {
 			req, err := http.NewRequest(tc.method, ts.URL+tc.url, nil) //nolint:noctx
 			require.NoError(t, err)
 
+			req.Header.Set("Accept-Encoding", "")
+
 			resp, err := ts.Client().Do(req)
 			require.NoError(t, err)
 

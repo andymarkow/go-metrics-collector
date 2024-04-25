@@ -113,11 +113,6 @@ func isCompressContentType(contentType string) bool {
 // Compress is a router middleware that handles gzip requests and responses.
 func (m *Middlewares) Compress(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// If content type is not supported, proceed with next handler.
-		if !isCompressContentType(r.Header.Get("Content-Type")) {
-			next.ServeHTTP(w, r)
-		}
-
 		// по умолчанию устанавливаем оригинальный http.ResponseWriter как тот,
 		// который будем передавать следующей функции
 		ow := w
@@ -125,7 +120,7 @@ func (m *Middlewares) Compress(next http.Handler) http.Handler {
 		// // проверяем, что клиент умеет получать от сервера сжатые данные в формате gzip
 		acceptEncoding := r.Header.Get("Accept-Encoding")
 
-		if strings.Contains(acceptEncoding, "gzip") {
+		if strings.Contains(acceptEncoding, "gzip") && isCompressContentType(r.Header.Get("Content-Type")) {
 			// оборачиваем оригинальный http.ResponseWriter новым с поддержкой сжатия
 			cw := newCompressWriter(w)
 			// меняем оригинальный http.ResponseWriter на новый
@@ -142,10 +137,12 @@ func (m *Middlewares) Compress(next http.Handler) http.Handler {
 			cr, err := newCompressReader(r.Body)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
+
 				return
 			}
 			// меняем тело запроса на новое
 			r.Body = cr
+
 			defer cr.Close()
 		}
 
