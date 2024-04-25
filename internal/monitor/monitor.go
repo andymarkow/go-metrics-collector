@@ -1,6 +1,9 @@
 package monitor
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"runtime"
 
 	"github.com/andymarkow/go-metrics-collector/internal/httpclient"
@@ -135,9 +138,28 @@ func (m *Monitor) PushJSON() {
 
 		m.log.Sugar().Debug("payload: ", payload)
 
-		_, err := m.client.R().
+		jsonPayload, err := json.Marshal(payload)
+		if err != nil {
+			m.log.Error("json.Marshal: " + err.Error())
+
+			continue
+		}
+
+		buf := bytes.NewBuffer(nil)
+		zbuf := gzip.NewWriter(buf)
+		defer zbuf.Close()
+
+		if _, err := zbuf.Write(jsonPayload); err != nil {
+			m.log.Error("zbuf.Write: " + err.Error())
+
+			continue
+		}
+		zbuf.Flush()
+
+		_, err = m.client.R().
 			SetHeader("Content-Type", "application/json").
-			SetBody(payload).
+			SetHeader("Content-Encoding", "gzip").
+			SetBody(buf.Bytes()).
 			Post("/update")
 
 		if err != nil {
