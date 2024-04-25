@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
 	"github.com/andymarkow/go-metrics-collector/internal/models"
@@ -46,12 +48,17 @@ func (h *Handlers) handleError(
 }
 
 func (h *Handlers) GetAllMetrics(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("content-type", "text/html")
-	w.WriteHeader(http.StatusOK)
+	result := make([]string, 0)
 
 	for k, v := range h.storage.GetAllMetrics() {
-		fmt.Fprintln(w, k, v)
+		result = append(result, fmt.Sprintf("%s %s", k, v))
 	}
+
+	slices.Sort(result)
+
+	w.Header().Set("content-type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(strings.Join(result, "\n")))
 }
 
 func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
