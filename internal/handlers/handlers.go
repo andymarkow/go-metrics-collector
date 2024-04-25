@@ -46,7 +46,7 @@ func (h *Handlers) handleError(
 }
 
 func (h *Handlers) GetAllMetrics(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("content-type", "text/plain")
+	w.Header().Set("content-type", "text/html")
 	w.WriteHeader(http.StatusOK)
 
 	for k, v := range h.storage.GetAllMetrics() {

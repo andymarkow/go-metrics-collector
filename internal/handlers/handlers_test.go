@@ -85,7 +85,7 @@ func TestGetAllMetricsHandler(t *testing.T) {
 				storage: strg,
 			},
 			want: want{
-				contentType: "text/plain",
+				contentType: "text/html",
 				statusCode:  http.StatusOK,
 			},
 		},
