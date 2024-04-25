@@ -99,6 +99,7 @@ func isCompressContentType(contentType string) bool {
 	contentTypes := []string{
 		"application/json",
 		"text/html",
+		"html/text",
 	}
 
 	for _, v := range contentTypes {
