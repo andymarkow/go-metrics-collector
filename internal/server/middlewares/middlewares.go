@@ -38,7 +38,7 @@ func (w *customResponseWriter) Write(b []byte) (int, error) {
 }
 
 func (w *customResponseWriter) WriteHeader(statusCode int) {
-	// w.ResponseWriter.WriteHeader(statusCode)
+	w.ResponseWriter.WriteHeader(statusCode)
 	w.responseData.status = statusCode
 }
 
