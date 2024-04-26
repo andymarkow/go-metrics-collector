@@ -182,7 +182,7 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.storage.SetCounter(metricPayload.ID, int64(*metricPayload.Delta))
+		h.storage.SetCounter(metricPayload.ID, *metricPayload.Delta)
 
 		val, err := h.storage.GetCounter(metricPayload.ID)
 		if err != nil {

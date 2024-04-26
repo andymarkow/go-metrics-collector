@@ -1,3 +1,4 @@
+//nolint:wrapcheck
 package middlewares
 
 import (
@@ -7,8 +8,8 @@ import (
 	"strings"
 )
 
-// compressWriter реализует интерфейс http.ResponseWriter и позволяет прозрачно для сервера
-// сжимать передаваемые данные и выставлять правильные HTTP-заголовки
+// compressWriter реализует интерфейс http.ResponseWriter и позволяет прозрачно для сервера.
+// сжимать передаваемые данные и выставлять правильные HTTP-заголовки.
 type compressWriter struct {
 	http.ResponseWriter
 	zw *gzip.Writer
@@ -64,8 +65,8 @@ func (c *compressWriter) Close() error {
 // 	return c.zw.Close()
 // }
 
-// compressReader реализует интерфейс io.ReadCloser и позволяет прозрачно для сервера
-// декомпрессировать получаемые от клиента данные
+// compressReader реализует интерфейс io.ReadCloser и позволяет прозрачно для сервера.
+// декомпрессировать получаемые от клиента данные.
 type compressReader struct {
 	r  io.ReadCloser
 	zr *gzip.Reader

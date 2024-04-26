@@ -118,7 +118,12 @@ func (m *Monitor) PushJSON() {
 
 		switch v.GetKind() {
 		case string(MetricCounter):
-			val := v.GetValue().(int64)
+			val, ok := v.GetValue().(int64)
+			if !ok {
+				m.log.Error("cant assert type int64: v.GetValue().(int64)")
+
+				continue
+			}
 
 			payload = models.Metrics{
 				ID:    v.GetName(),
@@ -127,7 +132,12 @@ func (m *Monitor) PushJSON() {
 			}
 
 		case string(MetricGauge):
-			val := v.GetValue().(float64)
+			val, ok := v.GetValue().(float64)
+			if !ok {
+				m.log.Error("cant assert type float64: v.GetValue().(float64)")
+
+				continue
+			}
 
 			payload = models.Metrics{
 				ID:    v.GetName(),
