@@ -51,7 +51,7 @@ func (h *Handlers) GetAllMetrics(w http.ResponseWriter, _ *http.Request) {
 	result := make([]string, 0)
 
 	for k, v := range h.storage.GetAllMetrics() {
-		result = append(result, fmt.Sprintf("%s %s", k, v))
+		result = append(result, fmt.Sprintf("%s %s", k, v.StringValue()))
 	}
 
 	slices.Sort(result)
@@ -136,9 +136,17 @@ func (h *Handlers) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 
 	switch metricType {
 	case string(monitor.MetricCounter):
-		h.storage.SetCounter(metricName, int64(metricValue))
+		if err := h.storage.SetCounter(metricName, int64(metricValue)); err != nil {
+			h.handleError(w, err, http.StatusInternalServerError)
+
+			return
+		}
 	case string(monitor.MetricGauge):
-		h.storage.SetGauge(metricName, metricValue)
+		if err := h.storage.SetGauge(metricName, metricValue); err != nil {
+			h.handleError(w, err, http.StatusInternalServerError)
+
+			return
+		}
 	default:
 		h.handleError(w, errormsg.ErrMetricInvalidType, http.StatusBadRequest)
 
@@ -182,7 +190,11 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.storage.SetCounter(metricPayload.ID, *metricPayload.Delta)
+		if err := h.storage.SetCounter(metricPayload.ID, *metricPayload.Delta); err != nil {
+			h.handleError(w, err, http.StatusInternalServerError)
+
+			return
+		}
 
 		val, err := h.storage.GetCounter(metricPayload.ID)
 		if err != nil {
@@ -204,7 +216,11 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.storage.SetGauge(metricPayload.ID, *metricPayload.Value)
+		if err := h.storage.SetGauge(metricPayload.ID, *metricPayload.Value); err != nil {
+			h.handleError(w, err, http.StatusInternalServerError)
+
+			return
+		}
 
 		metricResult = models.Metrics{
 			ID:    metricPayload.ID,

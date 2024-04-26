@@ -69,8 +69,12 @@ func TestGetAllMetricsHandler(t *testing.T) {
 	}
 
 	strg := storage.NewMemStorage()
-	strg.SetCounter("testCounter", 1)
-	strg.SetGauge("testGauge", 3.14)
+
+	err := strg.SetCounter("testCounter", 1)
+	require.NoError(t, err)
+
+	err = strg.SetGauge("testGauge", 3.14)
+	require.NoError(t, err)
 
 	testCases := []struct {
 		name   string
@@ -126,8 +130,12 @@ func TestGetMetricHandler(t *testing.T) {
 	}
 
 	strg := storage.NewMemStorage()
-	strg.SetCounter("testCounter", 1)
-	strg.SetGauge("testGauge", 3.14)
+
+	err := strg.SetCounter("testCounter", 1)
+	require.NoError(t, err)
+
+	err = strg.SetGauge("testGauge", 3.14)
+	require.NoError(t, err)
 
 	h := NewHandlers(strg, zap.NewNop())
 
