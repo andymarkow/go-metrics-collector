@@ -47,11 +47,11 @@ func (a *Agent) Start() error {
 		Logger:     a.log,
 	})
 
-	pollTicket := time.NewTicker(a.pollInterval)
+	pollTicker := time.NewTicker(a.pollInterval)
 	reportTicker := time.NewTicker(a.reportInterval)
 
 	defer func() {
-		pollTicket.Stop()
+		pollTicker.Stop()
 		reportTicker.Stop()
 	}()
 
@@ -59,7 +59,7 @@ func (a *Agent) Start() error {
 		select {
 		case <-reportTicker.C:
 			mon.PushJSON()
-		case <-pollTicket.C:
+		case <-pollTicker.C:
 			mon.Collect()
 		}
 	}
