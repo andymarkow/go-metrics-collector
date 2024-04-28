@@ -10,12 +10,34 @@ import (
 	"go.uber.org/zap"
 )
 
+// Middlewares is a collection of router middlewares.
 type Middlewares struct {
 	log *zap.Logger
 }
 
-type Config struct {
-	Logger *zap.Logger
+// New creates new Middlewares instance.
+func New(opts ...Option) *Middlewares {
+	// Default Middleware options
+	mw := &Middlewares{
+		log: zap.Must(zap.NewDevelopment()),
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(mw)
+	}
+
+	return mw
+}
+
+// Option is a router middleware option.
+type Option func(m *Middlewares)
+
+// WithLogger is a router middleware option that sets logger.
+func WithLogger(logger *zap.Logger) Option {
+	return func(m *Middlewares) {
+		m.log = logger
+	}
 }
 
 type responseData struct {
@@ -23,29 +45,52 @@ type responseData struct {
 	size   int
 }
 
-// customResponseWriter wraps http.ResponseWriter and tracks the response size and status code.
+// loggerResponseWriter wraps http.ResponseWriter and tracks the response size and status code.
 // Uses in Logger middleware.
-type customResponseWriter struct {
+type loggerResponseWriter struct {
 	http.ResponseWriter
 	responseData *responseData
 }
 
-func (w *customResponseWriter) Write(b []byte) (int, error) {
+func (w *loggerResponseWriter) Write(b []byte) (int, error) {
 	size, err := w.ResponseWriter.Write(b)
 	w.responseData.size += size
 
 	return size, err //nolint:wrapcheck
 }
 
-func (w *customResponseWriter) WriteHeader(statusCode int) {
+func (w *loggerResponseWriter) WriteHeader(statusCode int) {
 	w.ResponseWriter.WriteHeader(statusCode)
 	w.responseData.status = statusCode
 }
 
-func New(cfg *Config) *Middlewares {
-	return &Middlewares{
-		log: cfg.Logger,
-	}
+// Logger is a router middleware that logs requests and their processing time.
+func (m *Middlewares) Logger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startTime := time.Now()
+
+		responseData := &responseData{
+			status: 200,
+			size:   0,
+		}
+
+		cw := loggerResponseWriter{
+			ResponseWriter: w,
+			responseData:   responseData,
+		}
+
+		defer func() {
+			m.log.Info("request",
+				zap.String("uri", r.RequestURI),
+				zap.String("method", r.Method),
+				zap.Int("status", responseData.status),
+				zap.Int("size", responseData.size),
+				zap.Duration("duration_ms", time.Since(startTime)*1000),
+			)
+		}()
+
+		next.ServeHTTP(&cw, r)
+	})
 }
 
 // MetricValidator is a router middleware that validates metric name and type.
@@ -69,34 +114,5 @@ func (m *Middlewares) MetricValidator(next http.Handler) http.Handler {
 		}
 
 		next.ServeHTTP(w, r)
-	})
-}
-
-// Logger is a router middleware that logs requests and their processing time.
-func (m *Middlewares) Logger(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		startTime := time.Now()
-
-		responseData := &responseData{
-			status: 200,
-			size:   0,
-		}
-
-		cw := customResponseWriter{
-			ResponseWriter: w,
-			responseData:   responseData,
-		}
-
-		defer func() {
-			m.log.Info("request",
-				zap.String("uri", r.RequestURI),
-				zap.String("method", r.Method),
-				zap.Int("status", responseData.status),
-				zap.Int("size", responseData.size),
-				zap.Duration("duration_ms", time.Since(startTime)*1000),
-			)
-		}()
-
-		next.ServeHTTP(&cw, r)
 	})
 }

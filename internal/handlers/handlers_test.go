@@ -13,7 +13,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 func newChiHTTPRequest(method, url string, urlParams map[string]string, body io.Reader) *http.Request {
@@ -137,7 +136,7 @@ func TestGetMetricHandler(t *testing.T) {
 	err = strg.SetGauge("testGauge", 3.14)
 	require.NoError(t, err)
 
-	h := NewHandlers(strg, zap.NewNop())
+	h := NewHandlers(strg)
 
 	testCases := []struct {
 		name       string
@@ -243,7 +242,7 @@ func TestUpdateMetricHandler(t *testing.T) {
 
 	strg := storage.NewMemStorage()
 
-	h := NewHandlers(strg, zap.NewNop())
+	h := NewHandlers(strg)
 
 	testCases := []struct {
 		name   string
@@ -353,3 +352,109 @@ func TestUpdateMetricHandler(t *testing.T) {
 		})
 	}
 }
+
+// TestGetMetricJSONHandler tests the GetMetricJSON handler.
+// func TestGetMetricJSONHandler(t *testing.T) {
+// 	type want struct {
+// 		contentType string
+// 		statusCode  int
+// 		response    string
+// 	}
+
+// 	strg := storage.NewMemStorage()
+
+// 	err := strg.SetCounter("testCounter", 1)
+// 	require.NoError(t, err)
+
+// 	err = strg.SetGauge("testGauge", 3.14)
+// 	require.NoError(t, err)
+
+// 	h := NewHandlers(strg)
+
+// 	testCases := []struct {
+// 		name       string
+// 		metricType string
+// 		metricName string
+// 		want       want
+// 	}{
+// 		{
+// 			name:       "GetCounterMetric",
+// 			metricType: "counter",
+// 			metricName: "testCounter",
+// 			want: want{
+// 				contentType: "text/plain",
+// 				statusCode:  http.StatusOK,
+// 				response:    "1",
+// 			},
+// 		},
+// 		{
+// 			name:       "GetGaugeMetric",
+// 			metricType: "gauge",
+// 			metricName: "testGauge",
+// 			want: want{
+// 				contentType: "text/plain",
+// 				statusCode:  http.StatusOK,
+// 				response:    "3.14",
+// 			},
+// 		},
+// 		{
+// 			name:       "EmptyMetricName",
+// 			metricType: "counter",
+// 			metricName: "",
+// 			want: want{
+// 				contentType: "text/plain; charset=utf-8",
+// 				statusCode:  http.StatusNotFound,
+// 				response:    storage.ErrMetricNotFound.Error() + "\n",
+// 			},
+// 		},
+// 		{
+// 			name:       "NonExistingCounterMetric",
+// 			metricType: "counter",
+// 			metricName: "nonexistingCounter",
+// 			want: want{
+// 				contentType: "text/plain; charset=utf-8",
+// 				statusCode:  http.StatusNotFound,
+// 				response:    storage.ErrMetricNotFound.Error() + "\n",
+// 			},
+// 		},
+// 		{
+// 			name:       "NonExistingGaugeMetric",
+// 			metricType: "gauge",
+// 			metricName: "nonexistingGauge",
+// 			want: want{
+// 				contentType: "text/plain; charset=utf-8",
+// 				statusCode:  http.StatusNotFound,
+// 				response:    storage.ErrMetricNotFound.Error() + "\n",
+// 			},
+// 		},
+// 		{
+// 			name:       "InvalidMetricType",
+// 			metricType: "invalid",
+// 			metricName: "testCounter",
+// 			want: want{
+// 				contentType: "text/plain; charset=utf-8",
+// 				statusCode:  http.StatusBadRequest,
+// 				response:    errormsg.ErrMetricInvalidType.Error() + "\n",
+// 			},
+// 		},
+// 	}
+
+// 	for _, tc := range testCases {
+// 		t.Run(tc.name, func(t *testing.T) {
+// 			req := newChiHTTPRequest(http.MethodGet, "/value/{metricType}/{metricName}", map[string]string{
+// 				"metricName": tc.metricName,
+// 				"metricType": tc.metricType,
+// 			}, nil)
+
+// 			w := httptest.NewRecorder()
+
+// 			h.GetMetric(w, req)
+
+// 			resp := w.Result()
+// 			defer resp.Body.Close()
+
+// 			assert.Equal(t, tc.want.contentType, resp.Header.Get("Content-Type"))
+// 			assert.Equal(t, tc.want.statusCode, resp.StatusCode)
+// 		})
+// 	}
+// }

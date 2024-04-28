@@ -19,15 +19,34 @@ import (
 	"go.uber.org/zap"
 )
 
+// Handlers is a collection of handlers.
 type Handlers struct {
 	storage storage.Storage
 	log     *zap.Logger
 }
 
-func NewHandlers(strg storage.Storage, log *zap.Logger) *Handlers {
-	return &Handlers{
+// NewHandlers returns a new Handlers instance.
+func NewHandlers(strg storage.Storage, opts ...Option) *Handlers {
+	handlers := &Handlers{
 		storage: strg,
-		log:     log,
+		log:     zap.Must(zap.NewDevelopment()),
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(handlers)
+	}
+
+	return handlers
+}
+
+// Option is a functional option for Handlers.
+type Option func(h *Handlers)
+
+// WithLogger is a option for Handlers that sets logger.
+func WithLogger(logger *zap.Logger) Option {
+	return func(h *Handlers) {
+		h.log = logger
 	}
 }
 

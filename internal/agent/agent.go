@@ -14,6 +14,7 @@ type Agent struct {
 	pollInterval   time.Duration
 	reportInterval time.Duration
 	log            *zap.Logger
+	monitor        *monitor.Monitor
 }
 
 func NewAgent() (*Agent, error) {
@@ -22,18 +23,22 @@ func NewAgent() (*Agent, error) {
 		return nil, fmt.Errorf("newConfig: %w", err)
 	}
 
-	log, err := logger.NewZapLogger(&logger.Config{
-		Level: cfg.LogLevel,
-	})
+	log, err := logger.NewZapLogger(cfg.LogLevel)
 	if err != nil {
 		return nil, fmt.Errorf("logger.NewZapLogger: %w", err)
 	}
+
+	mon := monitor.NewMonitor(
+		monitor.WithLogger(log),
+		monitor.WithServerAddr(cfg.ServerAddr),
+	)
 
 	return &Agent{
 		serverAddr:     cfg.ServerAddr,
 		pollInterval:   time.Duration(cfg.PollInterval) * time.Second,
 		reportInterval: time.Duration(cfg.ReportInterval) * time.Second,
 		log:            log,
+		monitor:        mon,
 	}, nil
 }
 
@@ -41,11 +46,6 @@ func (a *Agent) Start() error {
 	a.log.Sugar().Infof("Starting agent with server endpoint '%s'", a.serverAddr)
 	a.log.Sugar().Infof("Polling interval: %s", a.pollInterval)
 	a.log.Sugar().Infof("Reporting interval: %s", a.reportInterval)
-
-	mon := monitor.NewMonitor(&monitor.Config{
-		ServerAddr: a.serverAddr,
-		Logger:     a.log,
-	})
 
 	pollTicker := time.NewTicker(a.pollInterval)
 	reportTicker := time.NewTicker(a.reportInterval)
@@ -58,9 +58,9 @@ func (a *Agent) Start() error {
 	for {
 		select {
 		case <-reportTicker.C:
-			mon.PushJSON()
+			a.monitor.PushJSON()
 		case <-pollTicker.C:
-			mon.Collect()
+			a.monitor.Collect()
 		}
 	}
 }

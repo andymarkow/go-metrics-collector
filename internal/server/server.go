@@ -34,11 +34,9 @@ type routerConfig struct {
 }
 
 func newRouter(cfg *routerConfig) chi.Router {
-	h := handlers.NewHandlers(cfg.storage, cfg.logger)
+	h := handlers.NewHandlers(cfg.storage, handlers.WithLogger(cfg.logger))
 
-	mw := middlewares.New(&middlewares.Config{
-		Logger: cfg.logger,
-	})
+	mw := middlewares.New(middlewares.WithLogger(cfg.logger))
 
 	r := chi.NewRouter()
 	r.Use(
@@ -70,9 +68,7 @@ func NewServer() (*Server, error) {
 		return nil, fmt.Errorf("newConfig: %w", err)
 	}
 
-	log, err := logger.NewZapLogger(&logger.Config{
-		Level: cfg.LogLevel,
-	})
+	log, err := logger.NewZapLogger(cfg.LogLevel)
 	if err != nil {
 		return nil, fmt.Errorf("logger.NewZapLogger: %w", err)
 	}
