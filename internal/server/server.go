@@ -8,14 +8,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-chi/chi/middleware"
-	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
 	"github.com/andymarkow/go-metrics-collector/internal/datamanager"
-	"github.com/andymarkow/go-metrics-collector/internal/handlers"
 	"github.com/andymarkow/go-metrics-collector/internal/logger"
-	"github.com/andymarkow/go-metrics-collector/internal/server/middlewares"
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
 )
 
@@ -26,40 +22,6 @@ type Server struct {
 	restoreOnBoot bool
 	dataLoader    *datamanager.DataLoader
 	dataSaver     *datamanager.DataSaver
-}
-
-type routerConfig struct {
-	storage storage.Storage
-	logger  *zap.Logger
-}
-
-func newRouter(cfg *routerConfig) chi.Router {
-	h := handlers.NewHandlers(cfg.storage, handlers.WithLogger(cfg.logger))
-
-	mw := middlewares.New(middlewares.WithLogger(cfg.logger))
-
-	r := chi.NewRouter()
-	r.Use(
-		middleware.Recoverer,
-		middleware.StripSlashes,
-		mw.Logger,
-		mw.Compress,
-	)
-
-	r.Get("/", h.GetAllMetrics)
-
-	r.Group(func(r chi.Router) {
-		r.Use(mw.MetricValidator)
-		r.Get("/value/{metricType}/{metricName}", h.GetMetric)
-		r.Post("/update/{metricType}/{metricName}/{metricValue}", h.UpdateMetric)
-	})
-
-	r.Group(func(r chi.Router) {
-		r.Post("/update", h.UpdateMetricJSON)
-		r.Post("/value", h.GetMetricJSON)
-	})
-
-	return r
 }
 
 func NewServer() (*Server, error) {
@@ -85,10 +47,7 @@ func NewServer() (*Server, error) {
 		return nil, fmt.Errorf("datamanager.NewDataSaver: %w", err)
 	}
 
-	r := newRouter(&routerConfig{
-		storage: strg,
-		logger:  log,
-	})
+	r := newRouter(strg, WithLogger(log))
 
 	srv := &http.Server{
 		Addr:              cfg.ServerAddr,

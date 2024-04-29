@@ -10,28 +10,6 @@ import (
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
 )
 
-type DataManager struct {
-	Loader *DataLoader
-	Saver  *DataSaver
-}
-
-func NewDataManager(fileName string, storage storage.Storage) (*DataManager, error) {
-	loader, err := NewDataLoader(fileName, storage)
-	if err != nil {
-		return nil, fmt.Errorf("NewDataLoader: %w", err)
-	}
-
-	saver, err := NewDataSaver(fileName, storage)
-	if err != nil {
-		return nil, fmt.Errorf("NewDataSaver: %w", err)
-	}
-
-	return &DataManager{
-		Loader: loader,
-		Saver:  saver,
-	}, nil
-}
-
 type DataSaver struct {
 	file    *os.File
 	encoder *json.Encoder

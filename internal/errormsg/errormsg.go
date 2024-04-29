@@ -4,6 +4,7 @@ import "errors"
 
 var (
 	ErrMetricInvalidType   = errors.New("invalid metric type")
+	ErrMetricInvalidDelta  = errors.New("invalid metric delta")
 	ErrMetricInvalidValue  = errors.New("invalid metric value")
 	ErrMetricEmptyName     = errors.New("empty metric name")
 	ErrMetricEmptyValue    = errors.New("empty metric value")

@@ -254,7 +254,7 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.handleError(w, err, http.StatusInternalServerError)
+		h.handleError(w, err, http.StatusBadRequest)
 
 		return
 	}
@@ -312,11 +312,6 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 			MType: metricPayload.MType,
 			Value: metricPayload.Value,
 		}
-
-	default:
-		h.handleError(w, errormsg.ErrMetricInvalidType, http.StatusBadRequest)
-
-		return
 	}
 
 	resp, err := json.Marshal(metricResult)
