@@ -1,10 +1,10 @@
 package monitor
 
 import (
-	"log"
 	"runtime"
 
 	"github.com/andymarkow/go-metrics-collector/internal/httpclient"
+	"go.uber.org/zap"
 )
 
 type metric interface {
@@ -19,12 +19,18 @@ type reseter interface {
 }
 
 type Monitor struct {
+	log     *zap.Logger
 	client  *httpclient.HTTPClient
 	memstat *runtime.MemStats
 	metrics []metric
 }
 
-func NewMonitor(serverAddr string) *Monitor {
+type Config struct {
+	ServerAddr string
+	Logger     *zap.Logger
+}
+
+func NewMonitor(cfg *Config) *Monitor {
 	var memstat runtime.MemStats
 
 	metrics := make([]metric, 0)
@@ -62,9 +68,10 @@ func NewMonitor(serverAddr string) *Monitor {
 	)
 
 	client := httpclient.NewHTTPClient()
-	client.SetBaseURL(serverAddr)
+	client.SetBaseURL(cfg.ServerAddr)
 
 	return &Monitor{
+		log:     cfg.Logger,
 		client:  client,
 		memstat: &memstat,
 		metrics: metrics,
@@ -89,7 +96,7 @@ func (m *Monitor) Push() {
 			Post("/update/{metricType}/{metricName}/{metricValue}")
 
 		if err != nil {
-			log.Println("client.Request:", err)
+			m.log.Error("client.Request: " + err.Error())
 
 			continue
 		}

@@ -2,36 +2,47 @@ package server
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 
 	"github.com/andymarkow/go-metrics-collector/internal/handlers"
-	"github.com/andymarkow/go-metrics-collector/internal/monitor"
+	"github.com/andymarkow/go-metrics-collector/internal/logger"
+	"github.com/andymarkow/go-metrics-collector/internal/server/middlewares"
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
 )
 
 type Server struct {
 	srv *http.Server
+	log *zap.Logger
 }
 
-func newRouter(strg storage.Storage) chi.Router {
-	h := handlers.NewHandlers(strg)
+type routerConfig struct {
+	storage storage.Storage
+	logger  *zap.Logger
+}
+
+func newRouter(cfg *routerConfig) chi.Router {
+	h := handlers.NewHandlers(cfg.storage)
+
+	mw := middlewares.New(&middlewares.Config{
+		Logger: cfg.logger,
+	})
 
 	r := chi.NewRouter()
 	r.Use(
-		middleware.Logger,
 		middleware.Recoverer,
 		middleware.StripSlashes,
+		mw.Logger,
 	)
 
 	r.Get("/", h.GetAllMetrics)
 
 	r.Group(func(r chi.Router) {
-		r.Use(metricValidatorMW)
+		r.Use(mw.MetricValidator)
 		r.Get("/value/{metricType}/{metricName}", h.GetMetric)
 		r.Post("/update/{metricType}/{metricName}/{metricValue}", h.UpdateMetric)
 	})
@@ -45,9 +56,19 @@ func NewServer() (*Server, error) {
 		return nil, fmt.Errorf("newConfig: %w", err)
 	}
 
+	log, err := logger.NewZapLogger(&logger.Config{
+		Level: cfg.LogLevel,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("logger.NewZapLogger: %w", err)
+	}
+
 	strg := storage.NewStorage(storage.NewMemStorage())
 
-	r := newRouter(strg)
+	r := newRouter(&routerConfig{
+		storage: strg,
+		logger:  log,
+	})
 
 	srv := &http.Server{
 		Addr:              cfg.ServerAddr,
@@ -59,39 +80,16 @@ func NewServer() (*Server, error) {
 
 	return &Server{
 		srv: srv,
+		log: log,
 	}, nil
 }
 
 func (s *Server) Start() error {
-	log.Printf("Starting server on %q\n", s.srv.Addr)
+	s.log.Sugar().Infof("Starting server on '%s'", s.srv.Addr)
 
 	if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server.ListenAndServe: %w", err)
 	}
 
 	return nil
-}
-
-// metricValidatorMW is a router middleware that validates metric name and type.
-func metricValidatorMW(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		metricType := chi.URLParam(r, "metricType")
-
-		switch metricType {
-		case string(monitor.MetricCounter), string(monitor.MetricGauge):
-		default:
-			http.Error(w, handlers.ErrMetricInvalidType.Error(), http.StatusBadRequest)
-
-			return
-		}
-
-		metricName := chi.URLParam(r, "metricName")
-		if metricName == "" {
-			http.Error(w, handlers.ErrMetricEmptyName.Error(), http.StatusNotFound)
-
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
 }

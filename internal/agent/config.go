@@ -10,6 +10,7 @@ import (
 
 type config struct {
 	ServerAddr     string `env:"ADDRESS"`
+	LogLevel       string `env:"LOG_LEVEL"`
 	PollInterval   int    `env:"POLL_INTERVAL"`
 	ReportInterval int    `env:"REPORT_INTERVAL"`
 }
@@ -18,6 +19,7 @@ func newConfig() (config, error) {
 	cfg := config{}
 
 	flag.StringVar(&cfg.ServerAddr, "a", "localhost:8080", "server endpoint address [env:ADDRESS]")
+	flag.StringVar(&cfg.LogLevel, "l", "info", "log output level [env:LOG_LEVEL]")
 	flag.IntVar(&cfg.PollInterval, "p", 2, "poll interval in seconds [env:POLL_INTERVAL]")
 	flag.IntVar(&cfg.ReportInterval, "r", 10, "report interval in seconds [env:REPORT_INTERVAL]")
 	flag.Parse()
