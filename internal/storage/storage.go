@@ -11,10 +11,10 @@ var (
 
 type Storage interface {
 	GetAllMetrics() map[string]string
-	GetCounter(key string) (int64, error)
-	SetCounter(key string, value int64)
-	GetGauge(key string) (float64, error)
-	SetGauge(key string, value float64)
+	GetCounter(name string) (int64, error)
+	SetCounter(name string, value int64)
+	GetGauge(name string) (float64, error)
+	SetGauge(name string, value float64)
 }
 
 func NewStorage(strg Storage) Storage {

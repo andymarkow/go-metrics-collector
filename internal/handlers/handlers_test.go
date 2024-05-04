@@ -8,10 +8,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func newChiHTTPRequest(method, url string, urlParams map[string]string, body io.Reader) *http.Request {
@@ -127,7 +129,7 @@ func TestGetMetricHandler(t *testing.T) {
 	strg.SetCounter("testCounter", 1)
 	strg.SetGauge("testGauge", 3.14)
 
-	h := NewHandlers(strg)
+	h := NewHandlers(strg, zap.NewNop())
 
 	testCases := []struct {
 		name       string
@@ -192,7 +194,7 @@ func TestGetMetricHandler(t *testing.T) {
 			want: want{
 				contentType: "text/plain; charset=utf-8",
 				statusCode:  http.StatusBadRequest,
-				response:    ErrMetricInvalidType.Error() + "\n",
+				response:    errormsg.ErrMetricInvalidType.Error() + "\n",
 			},
 		},
 	}
@@ -233,7 +235,7 @@ func TestUpdateMetricHandler(t *testing.T) {
 
 	strg := storage.NewMemStorage()
 
-	h := NewHandlers(strg)
+	h := NewHandlers(strg, zap.NewNop())
 
 	testCases := []struct {
 		name   string
@@ -276,7 +278,7 @@ func TestUpdateMetricHandler(t *testing.T) {
 			want: want{
 				contentType: "text/plain; charset=utf-8",
 				statusCode:  http.StatusBadRequest,
-				response:    ErrMetricInvalidType.Error() + "\n",
+				response:    errormsg.ErrMetricInvalidType.Error() + "\n",
 			},
 		},
 		{
@@ -289,7 +291,7 @@ func TestUpdateMetricHandler(t *testing.T) {
 			want: want{
 				contentType: "text/plain; charset=utf-8",
 				statusCode:  http.StatusBadRequest,
-				response:    ErrMetricEmptyValue.Error() + "\n",
+				response:    errormsg.ErrMetricEmptyValue.Error() + "\n",
 			},
 		},
 		{
@@ -302,7 +304,7 @@ func TestUpdateMetricHandler(t *testing.T) {
 			want: want{
 				contentType: "text/plain; charset=utf-8",
 				statusCode:  http.StatusBadRequest,
-				response:    ErrMetricInvalidType.Error() + "\n",
+				response:    errormsg.ErrMetricInvalidType.Error() + "\n",
 			},
 		},
 		{
@@ -315,7 +317,7 @@ func TestUpdateMetricHandler(t *testing.T) {
 			want: want{
 				contentType: "text/plain; charset=utf-8",
 				statusCode:  http.StatusBadRequest,
-				response:    ErrMetricInvalidValue.Error() + "\n",
+				response:    errormsg.ErrMetricInvalidValue.Error() + "\n",
 			},
 		},
 	}

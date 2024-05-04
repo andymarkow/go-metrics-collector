@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andymarkow/go-metrics-collector/internal/handlers"
+	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
 	"github.com/andymarkow/go-metrics-collector/internal/monitor"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
@@ -54,14 +54,14 @@ func (m *Middlewares) MetricValidator(next http.Handler) http.Handler {
 		switch metricType {
 		case string(monitor.MetricCounter), string(monitor.MetricGauge):
 		default:
-			http.Error(w, handlers.ErrMetricInvalidType.Error(), http.StatusBadRequest)
+			http.Error(w, errormsg.ErrMetricInvalidType.Error(), http.StatusBadRequest)
 
 			return
 		}
 
 		metricName := chi.URLParam(r, "metricName")
 		if metricName == "" {
-			http.Error(w, handlers.ErrMetricEmptyName.Error(), http.StatusNotFound)
+			http.Error(w, errormsg.ErrMetricEmptyName.Error(), http.StatusNotFound)
 
 			return
 		}

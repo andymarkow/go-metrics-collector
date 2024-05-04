@@ -43,6 +43,13 @@ func newCounterMetric(name string) CounterMetric {
 	}
 }
 
+func (m *CounterMetric) GetValue() any {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.value
+}
+
 func (m *CounterMetric) GetValueString() string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -76,6 +83,13 @@ func newGaugeMetric(name string) GaugeMetric {
 			name: name,
 		},
 	}
+}
+
+func (m *GaugeMetric) GetValue() any {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.value
 }
 
 func (m *GaugeMetric) GetValueString() string {
