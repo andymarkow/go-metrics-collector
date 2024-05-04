@@ -58,7 +58,7 @@ linters:
     - nlreturn
     - noctx
     - nolintlint
-    - nonamedreturns
+    # - nonamedreturns
     - nosprintfhostport
     # - paralleltest
     - predeclared

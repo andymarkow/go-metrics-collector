@@ -8,15 +8,15 @@ import (
 	"sync"
 )
 
-type MetricKind string
+type MetricType string
 
 const (
-	MetricCounter MetricKind = "counter"
-	MetricGauge   MetricKind = "gauge"
+	MetricCounter MetricType = "counter"
+	MetricGauge   MetricType = "gauge"
 )
 
 type baseMetric struct {
-	kind MetricKind
+	kind MetricType
 	name string
 	mu   sync.Mutex
 }

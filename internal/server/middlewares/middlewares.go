@@ -23,6 +23,8 @@ type responseData struct {
 	size   int
 }
 
+// customResponseWriter wraps http.ResponseWriter and tracks the response size and status code.
+// Uses in Logger middleware.
 type customResponseWriter struct {
 	http.ResponseWriter
 	responseData *responseData
@@ -70,6 +72,7 @@ func (m *Middlewares) MetricValidator(next http.Handler) http.Handler {
 	})
 }
 
+// Logger is a router middleware that logs requests and their processing time.
 func (m *Middlewares) Logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		startTime := time.Now()

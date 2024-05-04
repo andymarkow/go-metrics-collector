@@ -35,7 +35,7 @@ func TestMetricValidatorMW(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req, err := http.NewRequest(tc.method, ts.URL+tc.url, nil)
+			req, err := http.NewRequest(tc.method, ts.URL+tc.url, nil) //nolint:noctx
 			require.NoError(t, err)
 
 			resp, err := ts.Client().Do(req)
@@ -183,6 +183,8 @@ func TestRouter(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			req, err := http.NewRequest(tc.method, ts.URL+tc.url, nil) //nolint:noctx
 			require.NoError(t, err)
+
+			req.Header.Set("Accept-Encoding", "")
 
 			resp, err := ts.Client().Do(req)
 			require.NoError(t, err)

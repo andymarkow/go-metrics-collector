@@ -1,6 +1,9 @@
 package monitor
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"runtime"
 
 	"github.com/andymarkow/go-metrics-collector/internal/httpclient"
@@ -115,7 +118,12 @@ func (m *Monitor) PushJSON() {
 
 		switch v.GetKind() {
 		case string(MetricCounter):
-			val := v.GetValue().(int64)
+			val, ok := v.GetValue().(int64)
+			if !ok {
+				m.log.Error("cant assert type int64: v.GetValue().(int64)")
+
+				continue
+			}
 
 			payload = models.Metrics{
 				ID:    v.GetName(),
@@ -124,7 +132,12 @@ func (m *Monitor) PushJSON() {
 			}
 
 		case string(MetricGauge):
-			val := v.GetValue().(float64)
+			val, ok := v.GetValue().(float64)
+			if !ok {
+				m.log.Error("cant assert type float64: v.GetValue().(float64)")
+
+				continue
+			}
 
 			payload = models.Metrics{
 				ID:    v.GetName(),
@@ -135,9 +148,28 @@ func (m *Monitor) PushJSON() {
 
 		m.log.Sugar().Debug("payload: ", payload)
 
-		_, err := m.client.R().
+		jsonPayload, err := json.Marshal(payload)
+		if err != nil {
+			m.log.Error("json.Marshal: " + err.Error())
+
+			continue
+		}
+
+		buf := bytes.NewBuffer(nil)
+		zbuf := gzip.NewWriter(buf)
+		defer zbuf.Close()
+
+		if _, err := zbuf.Write(jsonPayload); err != nil {
+			m.log.Error("zbuf.Write: " + err.Error())
+
+			continue
+		}
+		zbuf.Flush()
+
+		_, err = m.client.R().
 			SetHeader("Content-Type", "application/json").
-			SetBody(payload).
+			SetHeader("Content-Encoding", "gzip").
+			SetBody(buf.Bytes()).
 			Post("/update")
 
 		if err != nil {

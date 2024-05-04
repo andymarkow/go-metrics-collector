@@ -37,6 +37,7 @@ func newRouter(cfg *routerConfig) chi.Router {
 		middleware.Recoverer,
 		middleware.StripSlashes,
 		mw.Logger,
+		mw.Compress,
 	)
 
 	r.Get("/", h.GetAllMetrics)

@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
 	"github.com/andymarkow/go-metrics-collector/internal/models"
@@ -46,12 +48,17 @@ func (h *Handlers) handleError(
 }
 
 func (h *Handlers) GetAllMetrics(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("content-type", "text/plain")
-	w.WriteHeader(http.StatusOK)
+	result := make([]string, 0)
 
 	for k, v := range h.storage.GetAllMetrics() {
-		fmt.Fprintln(w, k, v)
+		result = append(result, fmt.Sprintf("%s %s", k, v.StringValue()))
 	}
+
+	slices.Sort(result)
+
+	w.Header().Set("content-type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(strings.Join(result, "\n")))
 }
 
 func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
@@ -129,9 +136,17 @@ func (h *Handlers) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 
 	switch metricType {
 	case string(monitor.MetricCounter):
-		h.storage.SetCounter(metricName, int64(metricValue))
+		if err := h.storage.SetCounter(metricName, int64(metricValue)); err != nil {
+			h.handleError(w, err, http.StatusInternalServerError)
+
+			return
+		}
 	case string(monitor.MetricGauge):
-		h.storage.SetGauge(metricName, metricValue)
+		if err := h.storage.SetGauge(metricName, metricValue); err != nil {
+			h.handleError(w, err, http.StatusInternalServerError)
+
+			return
+		}
 	default:
 		h.handleError(w, errormsg.ErrMetricInvalidType, http.StatusBadRequest)
 
@@ -175,7 +190,11 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.storage.SetCounter(metricPayload.ID, int64(*metricPayload.Delta))
+		if err := h.storage.SetCounter(metricPayload.ID, *metricPayload.Delta); err != nil {
+			h.handleError(w, err, http.StatusInternalServerError)
+
+			return
+		}
 
 		val, err := h.storage.GetCounter(metricPayload.ID)
 		if err != nil {
@@ -197,7 +216,11 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.storage.SetGauge(metricPayload.ID, *metricPayload.Value)
+		if err := h.storage.SetGauge(metricPayload.ID, *metricPayload.Value); err != nil {
+			h.handleError(w, err, http.StatusInternalServerError)
+
+			return
+		}
 
 		metricResult = models.Metrics{
 			ID:    metricPayload.ID,
