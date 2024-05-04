@@ -3,57 +3,25 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
-	"github.com/go-chi/chi/middleware"
-	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
-	"github.com/andymarkow/go-metrics-collector/internal/handlers"
+	"github.com/andymarkow/go-metrics-collector/internal/datamanager"
 	"github.com/andymarkow/go-metrics-collector/internal/logger"
-	"github.com/andymarkow/go-metrics-collector/internal/server/middlewares"
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
 )
 
 type Server struct {
-	srv *http.Server
-	log *zap.Logger
-}
-
-type routerConfig struct {
-	storage storage.Storage
-	logger  *zap.Logger
-}
-
-func newRouter(cfg *routerConfig) chi.Router {
-	h := handlers.NewHandlers(cfg.storage, cfg.logger)
-
-	mw := middlewares.New(&middlewares.Config{
-		Logger: cfg.logger,
-	})
-
-	r := chi.NewRouter()
-	r.Use(
-		middleware.Recoverer,
-		middleware.StripSlashes,
-		mw.Logger,
-		mw.Compress,
-	)
-
-	r.Get("/", h.GetAllMetrics)
-
-	r.Group(func(r chi.Router) {
-		r.Use(mw.MetricValidator)
-		r.Get("/value/{metricType}/{metricName}", h.GetMetric)
-		r.Post("/update/{metricType}/{metricName}/{metricValue}", h.UpdateMetric)
-	})
-
-	r.Group(func(r chi.Router) {
-		r.Post("/update", h.UpdateMetricJSON)
-		r.Post("/value", h.GetMetricJSON)
-	})
-
-	return r
+	srv           *http.Server
+	log           *zap.Logger
+	storeInterval time.Duration
+	restoreOnBoot bool
+	dataLoader    *datamanager.DataLoader
+	dataSaver     *datamanager.DataSaver
 }
 
 func NewServer() (*Server, error) {
@@ -62,19 +30,24 @@ func NewServer() (*Server, error) {
 		return nil, fmt.Errorf("newConfig: %w", err)
 	}
 
-	log, err := logger.NewZapLogger(&logger.Config{
-		Level: cfg.LogLevel,
-	})
+	log, err := logger.NewZapLogger(cfg.LogLevel)
 	if err != nil {
 		return nil, fmt.Errorf("logger.NewZapLogger: %w", err)
 	}
 
 	strg := storage.NewStorage(storage.NewMemStorage())
 
-	r := newRouter(&routerConfig{
-		storage: strg,
-		logger:  log,
-	})
+	dl, err := datamanager.NewDataLoader(cfg.StoreFile, strg)
+	if err != nil {
+		return nil, fmt.Errorf("datamanager.NewDataManager: %w", err)
+	}
+
+	ds, err := datamanager.NewDataSaver(cfg.StoreFile, strg)
+	if err != nil {
+		return nil, fmt.Errorf("datamanager.NewDataSaver: %w", err)
+	}
+
+	r := newRouter(strg, WithLogger(log))
 
 	srv := &http.Server{
 		Addr:              cfg.ServerAddr,
@@ -85,17 +58,79 @@ func NewServer() (*Server, error) {
 	}
 
 	return &Server{
-		srv: srv,
-		log: log,
+		srv:           srv,
+		log:           log,
+		restoreOnBoot: cfg.RestoreOnBoot,
+		storeInterval: time.Duration(cfg.StoreInterval) * time.Second,
+		dataLoader:    dl,
+		dataSaver:     ds,
 	}, nil
 }
 
-func (s *Server) Start() error {
-	s.log.Sugar().Infof("Starting server on '%s'", s.srv.Addr)
-
-	if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("server.ListenAndServe: %w", err)
+func (s *Server) Close() error {
+	if err := s.dataSaver.Close(); err != nil {
+		return fmt.Errorf("dataSaver.Close: %w", err)
 	}
 
 	return nil
+}
+
+func (s *Server) LoadData() error {
+	defer s.dataLoader.Close()
+	if s.restoreOnBoot {
+		s.log.Sugar().Infof("Loading metrics data from file '%s'", s.dataLoader.GetFilename())
+
+		if err := s.dataLoader.Load(); err != nil {
+			return fmt.Errorf("dataLoader.Load: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (s *Server) Start() error {
+	defer s.Close()
+
+	if err := s.LoadData(); err != nil {
+		return fmt.Errorf("server.LoadData: %w", err)
+	}
+
+	s.log.Sugar().Infof("Starting server on '%s'", s.srv.Addr)
+
+	errChan := make(chan error, 1)
+
+	go func() {
+		if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errChan <- fmt.Errorf("server.ListenAndServe: %w", err)
+		}
+	}()
+
+	storeTicker := time.NewTicker(s.storeInterval)
+
+	defer storeTicker.Stop()
+
+	// Graceful shutdown handler
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	for {
+		select {
+		case err := <-errChan:
+			return err
+
+		case <-quit:
+			s.log.Sugar().Infof("Gracefully shutting down server...")
+
+			if err := s.dataSaver.PurgeAndSave(); err != nil {
+				return fmt.Errorf("dataSaver.PurgeAndSave: %w", err)
+			}
+
+			return nil
+
+		case <-storeTicker.C:
+			if err := s.dataSaver.PurgeAndSave(); err != nil {
+				s.log.Sugar().Errorf("dataSaver.PurgeAndSave: %v", err)
+			}
+		}
+	}
 }

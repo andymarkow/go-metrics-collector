@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
@@ -13,7 +14,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 func newChiHTTPRequest(method, url string, urlParams map[string]string, body io.Reader) *http.Request {
@@ -137,7 +137,7 @@ func TestGetMetricHandler(t *testing.T) {
 	err = strg.SetGauge("testGauge", 3.14)
 	require.NoError(t, err)
 
-	h := NewHandlers(strg, zap.NewNop())
+	h := NewHandlers(strg)
 
 	testCases := []struct {
 		name       string
@@ -243,7 +243,7 @@ func TestUpdateMetricHandler(t *testing.T) {
 
 	strg := storage.NewMemStorage()
 
-	h := NewHandlers(strg, zap.NewNop())
+	h := NewHandlers(strg)
 
 	testCases := []struct {
 		name   string
@@ -350,6 +350,278 @@ func TestUpdateMetricHandler(t *testing.T) {
 			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want.response, string(body))
+		})
+	}
+}
+
+// TestGetMetricJSONHandler tests the GetMetricJSON handler.
+func TestGetMetricJSONHandler(t *testing.T) {
+	type want struct {
+		contentType string
+		statusCode  int
+		response    string
+	}
+
+	strg := storage.NewMemStorage()
+
+	err := strg.SetCounter("testCounter", 1)
+	require.NoError(t, err)
+
+	err = strg.SetGauge("testGauge", 3.14)
+	require.NoError(t, err)
+
+	h := NewHandlers(strg)
+
+	testCases := []struct {
+		name string
+		body string
+		want want
+	}{
+		{
+			name: "GetCounterMetric",
+			body: `{"id": "testCounter", "type": "counter"}`,
+			want: want{
+				contentType: "application/json",
+				statusCode:  http.StatusOK,
+				response:    `{"id": "testCounter", "type": "counter", "delta": 1}`,
+			},
+		},
+		{
+			name: "GetGaugeMetric",
+			body: `{"id": "testGauge", "type": "gauge"}`,
+			want: want{
+				contentType: "application/json",
+				statusCode:  http.StatusOK,
+				response:    `{"id": "testGauge", "type": "gauge", "value": 3.14}`,
+			},
+		},
+		{
+			name: "EmptyRequestPayload",
+			body: "",
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusBadRequest,
+				response:    "",
+			},
+		},
+		{
+			name: "EmptyMetricName",
+			body: `{"id": "", "type": "counter"}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusBadRequest,
+				response:    "",
+			},
+		},
+		{
+			name: "EmptyMetricType",
+			body: `{"id": "testCounter", "type": ""}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusBadRequest,
+				response:    "",
+			},
+		},
+		{
+			name: "NonExistingCounterMetric",
+			body: `{"id": "nonexistingCounter", "type": "counter"}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusNotFound,
+				response:    "",
+			},
+		},
+		{
+			name: "NonExistingGaugeMetric",
+			body: `{"id": "nonexistingGauge", "type": "gauge"}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusNotFound,
+				response:    "",
+			},
+		},
+		{
+			name: "InvalidMetricType",
+			body: `{"id": "testGauge", "type": "invalid"}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusBadRequest,
+				response:    "",
+			},
+		},
+		{
+			name: "InvalidJSONPayload",
+			body: `{"id": "testGauge", "type": "counter}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusInternalServerError,
+				response:    "",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := newChiHTTPRequest(http.MethodPost, "/value", nil, strings.NewReader(tc.body))
+
+			w := httptest.NewRecorder()
+
+			h.GetMetricJSON(w, req)
+
+			resp := w.Result()
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.want.contentType, resp.Header.Get("Content-Type"))
+			assert.Equal(t, tc.want.statusCode, resp.StatusCode)
+
+			if tc.want.response != "" {
+				assert.JSONEq(t, tc.want.response, string(body))
+			}
+		})
+	}
+}
+
+// TestUpdateMetricJSONHandler tests the UpdateMetricJSON handler.
+func TestUpdateMetricJSONHandler(t *testing.T) {
+	type want struct {
+		contentType string
+		statusCode  int
+		response    string
+	}
+
+	strg := storage.NewMemStorage()
+
+	h := NewHandlers(strg)
+
+	testCases := []struct {
+		name string
+		body string
+		want want
+	}{
+		{
+			name: "UpdateCounterMetric",
+			body: `{"id": "testCounter", "type": "counter", "delta": 1}`,
+			want: want{
+				contentType: "application/json",
+				statusCode:  http.StatusOK,
+				response:    `{"id": "testCounter", "type": "counter", "delta": 1}`,
+			},
+		},
+		{
+			name: "UpdateGaugeMetric",
+			body: `{"id": "testGauge", "type": "gauge", "value": 3.14}`,
+			want: want{
+				contentType: "application/json",
+				statusCode:  http.StatusOK,
+				response:    `{"id": "testGauge", "type": "gauge", "value": 3.14}`,
+			},
+		},
+		{
+			name: "EmptyRequestPayload",
+			body: "",
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusBadRequest,
+				response:    "",
+			},
+		},
+		{
+			name: "EmptyMetricName",
+			body: `{"id": "", "type": "gauge", "value": 3.14}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusBadRequest,
+				response:    "",
+			},
+		},
+		{
+			name: "EmptyMetricType",
+			body: `{"id": "testCounter", "type": "", "delta": 1}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusBadRequest,
+				response:    "",
+			},
+		},
+		{
+			name: "EmptyCounterDelta",
+			body: `{"id": "testCounter", "type": "counter"}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusBadRequest,
+				response:    "",
+			},
+		},
+		{
+			name: "EmptyGaugeValue",
+			body: `{"id": "testGauge", "type": "gauge"}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusBadRequest,
+				response:    "",
+			},
+		},
+		{
+			name: "InvalidMetricType",
+			body: `{"id": "testGauge", "type": "invalid", "value": 3.14}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusBadRequest,
+				response:    "",
+			},
+		},
+		{
+			name: "InvalidCounterDelta",
+			body: `{"id": "testCounter", "type": "counter", "delta": "1"}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusBadRequest,
+				response:    "",
+			},
+		},
+		{
+			name: "InvalidGaugeValue",
+			body: `{"id": "testGauge", "type": "gauge", "value": "3.14"}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusBadRequest,
+				response:    "",
+			},
+		},
+		{
+			name: "InvalidJSONPayload",
+			body: `{"id": "testGauge", "type": "gauge", "value": "3.14}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusBadRequest,
+				response:    "",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := newChiHTTPRequest(http.MethodPost, "/update", nil, strings.NewReader(tc.body))
+
+			w := httptest.NewRecorder()
+
+			h.UpdateMetricJSON(w, req)
+
+			resp := w.Result()
+			defer resp.Body.Close()
+
+			assert.Equal(t, tc.want.statusCode, resp.StatusCode)
+			assert.Equal(t, tc.want.contentType, resp.Header.Get("Content-Type"))
+
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			if tc.want.response != "" {
+				assert.JSONEq(t, tc.want.response, string(body))
+			}
 		})
 	}
 }

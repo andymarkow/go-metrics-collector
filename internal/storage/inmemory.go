@@ -11,8 +11,8 @@ import (
 var _ Storage = (*MemStorage)(nil)
 
 type Metric struct {
-	Type  monitor.MetricType
-	Value any
+	Type  monitor.MetricType `json:"type"`
+	Value any                `json:"value"`
 }
 
 func (m *Metric) StringValue() string {
@@ -26,20 +26,16 @@ func (m *Metric) StringValue() string {
 	return fmt.Sprintf("%v", m.Value)
 }
 
-type CounterValue struct {
-	Value int64
+type CounterValue int64
+
+func (v CounterValue) String() string {
+	return strconv.FormatInt(int64(v), 10)
 }
 
-func (v *CounterValue) String() string {
-	return strconv.FormatInt(v.Value, 10)
-}
+type GaugeValue float64
 
-type GaugeValue struct {
-	Value float64
-}
-
-func (v *GaugeValue) String() string {
-	return strconv.FormatFloat(v.Value, 'f', -1, 64)
+func (v GaugeValue) String() string {
+	return strconv.FormatFloat(float64(v), 'f', -1, 64)
 }
 
 type MemStorage struct {
@@ -59,7 +55,7 @@ func (s *MemStorage) GetCounter(name string) (int64, error) {
 
 	if metric, ok := s.data[name]; ok {
 		if v, ok := metric.Value.(CounterValue); ok {
-			return v.Value, nil
+			return int64(v), nil
 		}
 
 		return 0, ErrMetricIsNotCounter
@@ -76,7 +72,7 @@ func (s *MemStorage) SetCounter(name string, value int64) error {
 		if v, ok := metric.Value.(CounterValue); ok {
 			s.data[name] = Metric{
 				Type:  monitor.MetricCounter,
-				Value: CounterValue{Value: v.Value + value},
+				Value: CounterValue(int64(v) + value),
 			}
 
 			return nil
@@ -87,7 +83,7 @@ func (s *MemStorage) SetCounter(name string, value int64) error {
 
 	s.data[name] = Metric{
 		Type:  monitor.MetricCounter,
-		Value: CounterValue{Value: value},
+		Value: CounterValue(value),
 	}
 
 	return nil
@@ -99,7 +95,7 @@ func (s *MemStorage) GetGauge(name string) (float64, error) {
 
 	if metric, ok := s.data[name]; ok {
 		if v, ok := metric.Value.(GaugeValue); ok {
-			return v.Value, nil
+			return float64(v), nil
 		}
 
 		return 0, ErrMetricIsNotGauge
@@ -120,21 +116,51 @@ func (s *MemStorage) SetGauge(name string, value float64) error {
 
 	s.data[name] = Metric{
 		Type:  monitor.MetricGauge,
-		Value: GaugeValue{Value: value},
+		Value: GaugeValue(value),
 	}
 
 	return nil
 }
 
 func (s *MemStorage) GetAllMetrics() map[string]Metric {
-	allMetrics := make(map[string]Metric)
-
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	for key, val := range s.data {
-		allMetrics[key] = val
+	return s.data
+}
+
+func (s *MemStorage) LoadData(data map[string]Metric) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for k, metric := range data {
+		switch metric.Type {
+		case monitor.MetricCounter:
+			v, ok := metric.Value.(float64)
+			if !ok {
+				return fmt.Errorf("failed load metric (%s): invalid value type (%T)", k, metric.Value)
+			}
+
+			s.data[k] = Metric{
+				Type:  metric.Type,
+				Value: CounterValue(int64(v)),
+			}
+
+		case monitor.MetricGauge:
+			v, ok := metric.Value.(float64)
+			if !ok {
+				return fmt.Errorf("failed load metric (%s): invalid value type (%T)", k, metric.Value)
+			}
+
+			s.data[k] = Metric{
+				Type:  metric.Type,
+				Value: GaugeValue(v),
+			}
+
+		default:
+			return fmt.Errorf("failed load metric (%s): unknown metric type (%s)", k, metric.Type)
+		}
 	}
 
-	return allMetrics
+	return nil
 }

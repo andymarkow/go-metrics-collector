@@ -6,6 +6,9 @@
 
 .EXPORT_ALL_VARIABLES:
 
+FILE_STORAGE_PATH=metrics-db.json
+STORE_INTERVAL=10
+
 .PHONY: all
 
 all: fmt tidy test lint

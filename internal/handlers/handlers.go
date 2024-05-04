@@ -19,15 +19,34 @@ import (
 	"go.uber.org/zap"
 )
 
+// Handlers is a collection of handlers.
 type Handlers struct {
 	storage storage.Storage
 	log     *zap.Logger
 }
 
-func NewHandlers(strg storage.Storage, log *zap.Logger) *Handlers {
-	return &Handlers{
+// NewHandlers returns a new Handlers instance.
+func NewHandlers(strg storage.Storage, opts ...Option) *Handlers {
+	handlers := &Handlers{
 		storage: strg,
-		log:     log,
+		log:     zap.NewNop(),
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(handlers)
+	}
+
+	return handlers
+}
+
+// Option is a functional option for Handlers.
+type Option func(h *Handlers)
+
+// WithLogger is a option for Handlers that sets logger.
+func WithLogger(logger *zap.Logger) Option {
+	return func(h *Handlers) {
+		h.log = logger
 	}
 }
 
@@ -63,12 +82,6 @@ func (h *Handlers) GetAllMetrics(w http.ResponseWriter, _ *http.Request) {
 
 func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 	metricName := chi.URLParam(r, "metricName")
-	if metricName == "" {
-		h.handleError(w, errormsg.ErrMetricEmptyName, http.StatusNotFound)
-
-		return
-	}
-
 	metricType := chi.URLParam(r, "metricType")
 
 	var metricValue string
@@ -158,94 +171,6 @@ func (h *Handlers) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(http.StatusText(http.StatusOK)))
 }
 
-func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
-	var metricPayload models.Metrics
-	var metricResult models.Metrics
-
-	if err := json.NewDecoder(r.Body).Decode(&metricPayload); err != nil {
-		if errors.Is(err, io.EOF) {
-			h.handleError(w, errormsg.ErrEmptyRequestPayload, http.StatusBadRequest)
-
-			return
-		}
-
-		h.handleError(w, err, http.StatusInternalServerError)
-
-		return
-	}
-
-	h.log.Sugar().Debugf("payload: %+v", metricPayload)
-
-	if err := metricPayload.Validate(); err != nil {
-		h.handleError(w, err, http.StatusBadRequest)
-
-		return
-	}
-
-	switch metricPayload.MType {
-	case string(monitor.MetricCounter):
-		if metricPayload.Delta == nil {
-			h.handleError(w, errormsg.ErrMetricEmptyDelta, http.StatusBadRequest)
-
-			return
-		}
-
-		if err := h.storage.SetCounter(metricPayload.ID, *metricPayload.Delta); err != nil {
-			h.handleError(w, err, http.StatusInternalServerError)
-
-			return
-		}
-
-		val, err := h.storage.GetCounter(metricPayload.ID)
-		if err != nil {
-			h.handleError(w, err, http.StatusInternalServerError)
-
-			return
-		}
-
-		metricResult = models.Metrics{
-			ID:    metricPayload.ID,
-			MType: metricPayload.MType,
-			Delta: &val,
-		}
-
-	case string(monitor.MetricGauge):
-		if metricPayload.Value == nil {
-			h.handleError(w, errormsg.ErrMetricEmptyValue, http.StatusBadRequest)
-
-			return
-		}
-
-		if err := h.storage.SetGauge(metricPayload.ID, *metricPayload.Value); err != nil {
-			h.handleError(w, err, http.StatusInternalServerError)
-
-			return
-		}
-
-		metricResult = models.Metrics{
-			ID:    metricPayload.ID,
-			MType: metricPayload.MType,
-			Value: metricPayload.Value,
-		}
-
-	default:
-		h.handleError(w, errormsg.ErrMetricInvalidType, http.StatusBadRequest)
-
-		return
-	}
-
-	resp, err := json.Marshal(metricResult)
-	if err != nil {
-		h.handleError(w, err, http.StatusInternalServerError)
-
-		return
-	}
-
-	w.Header().Set("content-type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(resp)
-}
-
 func (h *Handlers) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	var metricPayload models.Metrics
 	var metricResult models.Metrics
@@ -304,11 +229,89 @@ func (h *Handlers) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 			MType: metricPayload.MType,
 			Value: &val,
 		}
+	}
 
-	default:
-		h.handleError(w, errormsg.ErrMetricInvalidType, http.StatusBadRequest)
+	resp, err := json.Marshal(metricResult)
+	if err != nil {
+		h.handleError(w, err, http.StatusInternalServerError)
 
 		return
+	}
+
+	w.Header().Set("content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(resp)
+}
+
+func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
+	var metricPayload models.Metrics
+	var metricResult models.Metrics
+
+	if err := json.NewDecoder(r.Body).Decode(&metricPayload); err != nil {
+		if errors.Is(err, io.EOF) {
+			h.handleError(w, errormsg.ErrEmptyRequestPayload, http.StatusBadRequest)
+
+			return
+		}
+
+		h.handleError(w, err, http.StatusBadRequest)
+
+		return
+	}
+
+	h.log.Sugar().Debugf("payload: %+v", metricPayload)
+
+	if err := metricPayload.Validate(); err != nil {
+		h.handleError(w, err, http.StatusBadRequest)
+
+		return
+	}
+
+	switch metricPayload.MType {
+	case string(monitor.MetricCounter):
+		if metricPayload.Delta == nil {
+			h.handleError(w, errormsg.ErrMetricEmptyDelta, http.StatusBadRequest)
+
+			return
+		}
+
+		if err := h.storage.SetCounter(metricPayload.ID, *metricPayload.Delta); err != nil {
+			h.handleError(w, err, http.StatusInternalServerError)
+
+			return
+		}
+
+		val, err := h.storage.GetCounter(metricPayload.ID)
+		if err != nil {
+			h.handleError(w, err, http.StatusInternalServerError)
+
+			return
+		}
+
+		metricResult = models.Metrics{
+			ID:    metricPayload.ID,
+			MType: metricPayload.MType,
+			Delta: &val,
+		}
+
+	case string(monitor.MetricGauge):
+		if metricPayload.Value == nil {
+			h.handleError(w, errormsg.ErrMetricEmptyValue, http.StatusBadRequest)
+
+			return
+		}
+
+		if err := h.storage.SetGauge(metricPayload.ID, *metricPayload.Value); err != nil {
+			h.handleError(w, err, http.StatusInternalServerError)
+
+			return
+		}
+
+		metricResult = models.Metrics{
+			ID:    metricPayload.ID,
+			MType: metricPayload.MType,
+			Value: metricPayload.Value,
+		}
 	}
 
 	resp, err := json.Marshal(metricResult)

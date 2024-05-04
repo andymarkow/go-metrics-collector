@@ -30,12 +30,7 @@ type Monitor struct {
 	metrics []metric
 }
 
-type Config struct {
-	ServerAddr string
-	Logger     *zap.Logger
-}
-
-func NewMonitor(cfg *Config) *Monitor {
+func NewMonitor(opts ...Option) *Monitor {
 	var memstat runtime.MemStats
 
 	metrics := make([]metric, 0)
@@ -73,13 +68,35 @@ func NewMonitor(cfg *Config) *Monitor {
 	)
 
 	client := httpclient.NewHTTPClient()
-	client.SetBaseURL(cfg.ServerAddr)
 
-	return &Monitor{
-		log:     cfg.Logger,
+	mon := &Monitor{
+		log:     zap.Must(zap.NewDevelopment()),
 		client:  client,
 		memstat: &memstat,
 		metrics: metrics,
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(mon)
+	}
+
+	return mon
+}
+
+// Option is a monitor option.
+type Option func(m *Monitor)
+
+// WithLogger is a monitor option that sets logger.
+func WithLogger(logger *zap.Logger) Option {
+	return func(m *Monitor) {
+		m.log = logger
+	}
+}
+
+func WithServerAddr(addr string) Option {
+	return func(m *Monitor) {
+		m.client.SetBaseURL(addr)
 	}
 }
 
