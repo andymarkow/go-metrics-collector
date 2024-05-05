@@ -36,12 +36,16 @@ func NewServer() (*Server, error) {
 		return nil, fmt.Errorf("logger.NewZapLogger: %w", err)
 	}
 
-	pgstore, err := storage.NewPostgresStorage(cfg.DatabaseDSN)
-	if err != nil {
-		return nil, fmt.Errorf("storage.NewPostgresStorage: %w", err)
+	var strg storage.Storage = storage.NewMemStorage()
+
+	if cfg.DatabaseDSN != "" {
+		strg, err = storage.NewPostgresStorage(cfg.DatabaseDSN)
+		if err != nil {
+			return nil, fmt.Errorf("storage.NewPostgresStorage: %w", err)
+		}
 	}
 
-	store := storage.NewStorage(pgstore)
+	store := storage.NewStorage(strg)
 
 	dl, err := datamanager.NewDataLoader(cfg.StoreFile, store)
 	if err != nil {
