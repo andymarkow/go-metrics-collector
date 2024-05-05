@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"sync"
@@ -49,7 +50,15 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
-func (s *MemStorage) GetCounter(name string) (int64, error) {
+func (s *MemStorage) Close() error {
+	return nil
+}
+
+func (s *MemStorage) Ping(_ context.Context) error {
+	return nil
+}
+
+func (s *MemStorage) GetCounter(_ context.Context, name string) (int64, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -64,7 +73,7 @@ func (s *MemStorage) GetCounter(name string) (int64, error) {
 	return 0, ErrMetricNotFound
 }
 
-func (s *MemStorage) SetCounter(name string, value int64) error {
+func (s *MemStorage) SetCounter(_ context.Context, name string, value int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -89,7 +98,7 @@ func (s *MemStorage) SetCounter(name string, value int64) error {
 	return nil
 }
 
-func (s *MemStorage) GetGauge(name string) (float64, error) {
+func (s *MemStorage) GetGauge(_ context.Context, name string) (float64, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -104,7 +113,7 @@ func (s *MemStorage) GetGauge(name string) (float64, error) {
 	return 0, ErrMetricNotFound
 }
 
-func (s *MemStorage) SetGauge(name string, value float64) error {
+func (s *MemStorage) SetGauge(_ context.Context, name string, value float64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -122,14 +131,14 @@ func (s *MemStorage) SetGauge(name string, value float64) error {
 	return nil
 }
 
-func (s *MemStorage) GetAllMetrics() map[string]Metric {
+func (s *MemStorage) GetAllMetrics(_ context.Context) map[string]Metric {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.data
 }
 
-func (s *MemStorage) LoadData(data map[string]Metric) error {
+func (s *MemStorage) LoadData(_ context.Context, data map[string]Metric) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

@@ -1,6 +1,7 @@
 package datamanager
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -54,7 +55,9 @@ func (d *DataSaver) PurgeAndSave() error {
 }
 
 func (d *DataSaver) Save() error {
-	data := d.storage.GetAllMetrics()
+	ctx := context.TODO()
+
+	data := d.storage.GetAllMetrics(ctx)
 
 	d.encoder.SetIndent("", "\t")
 
@@ -106,7 +109,9 @@ func (d *DataLoader) Load() error {
 		return fmt.Errorf("decoder.Decode: %w", err)
 	}
 
-	if err := d.storage.LoadData(data); err != nil {
+	ctx := context.TODO()
+
+	if err := d.storage.LoadData(ctx, data); err != nil {
 		return fmt.Errorf("storage.LoadData: %w", err)
 	}
 

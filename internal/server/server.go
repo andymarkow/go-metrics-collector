@@ -18,6 +18,7 @@ import (
 type Server struct {
 	srv           *http.Server
 	log           *zap.Logger
+	storage       storage.Storage
 	storeInterval time.Duration
 	restoreOnBoot bool
 	dataLoader    *datamanager.DataLoader
@@ -35,19 +36,24 @@ func NewServer() (*Server, error) {
 		return nil, fmt.Errorf("logger.NewZapLogger: %w", err)
 	}
 
-	strg := storage.NewStorage(storage.NewMemStorage())
+	pgstore, err := storage.NewPostgresStorage(cfg.DatabaseDSN)
+	if err != nil {
+		return nil, fmt.Errorf("storage.NewPostgresStorage: %w", err)
+	}
 
-	dl, err := datamanager.NewDataLoader(cfg.StoreFile, strg)
+	store := storage.NewStorage(pgstore)
+
+	dl, err := datamanager.NewDataLoader(cfg.StoreFile, store)
 	if err != nil {
 		return nil, fmt.Errorf("datamanager.NewDataManager: %w", err)
 	}
 
-	ds, err := datamanager.NewDataSaver(cfg.StoreFile, strg)
+	ds, err := datamanager.NewDataSaver(cfg.StoreFile, store)
 	if err != nil {
 		return nil, fmt.Errorf("datamanager.NewDataSaver: %w", err)
 	}
 
-	r := newRouter(strg, WithLogger(log))
+	r := newRouter(store, WithLogger(log))
 
 	srv := &http.Server{
 		Addr:              cfg.ServerAddr,
@@ -61,18 +67,21 @@ func NewServer() (*Server, error) {
 		srv:           srv,
 		log:           log,
 		restoreOnBoot: cfg.RestoreOnBoot,
+		storage:       store,
 		storeInterval: time.Duration(cfg.StoreInterval) * time.Second,
 		dataLoader:    dl,
 		dataSaver:     ds,
 	}, nil
 }
 
-func (s *Server) Close() error {
+func (s *Server) Close() {
 	if err := s.dataSaver.Close(); err != nil {
-		return fmt.Errorf("dataSaver.Close: %w", err)
+		s.log.Error("dataSaver.Close", zap.Error(err))
 	}
 
-	return nil
+	if err := s.storage.Close(); err != nil {
+		s.log.Error("storage.Close", zap.Error(err))
+	}
 }
 
 func (s *Server) LoadData() error {

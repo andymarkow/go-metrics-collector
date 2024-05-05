@@ -1,6 +1,9 @@
 package storage
 
-import "errors"
+import (
+	"context"
+	"errors"
+)
 
 var (
 	ErrMetricNotFound     = errors.New("metric not found")
@@ -9,12 +12,14 @@ var (
 )
 
 type Storage interface {
-	GetAllMetrics() map[string]Metric
-	GetCounter(name string) (int64, error)
-	SetCounter(name string, value int64) error
-	GetGauge(name string) (float64, error)
-	SetGauge(name string, value float64) error
-	LoadData(data map[string]Metric) error
+	GetAllMetrics(ctx context.Context) map[string]Metric
+	GetCounter(ctx context.Context, name string) (int64, error)
+	SetCounter(ctx context.Context, name string, value int64) error
+	GetGauge(ctx context.Context, name string) (float64, error)
+	SetGauge(ctx context.Context, name string, value float64) error
+	LoadData(ctx context.Context, data map[string]Metric) error
+	Ping(ctx context.Context) error
+	Close() error
 }
 
 func NewStorage(strg Storage) Storage {

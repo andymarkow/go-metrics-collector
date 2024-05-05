@@ -70,10 +70,12 @@ func TestGetAllMetricsHandler(t *testing.T) {
 
 	strg := storage.NewMemStorage()
 
-	err := strg.SetCounter("testCounter", 1)
+	ctx := context.Background()
+
+	err := strg.SetCounter(ctx, "testCounter", 1)
 	require.NoError(t, err)
 
-	err = strg.SetGauge("testGauge", 3.14)
+	err = strg.SetGauge(ctx, "testGauge", 3.14)
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -131,10 +133,12 @@ func TestGetMetricHandler(t *testing.T) {
 
 	strg := storage.NewMemStorage()
 
-	err := strg.SetCounter("testCounter", 1)
+	ctx := context.Background()
+
+	err := strg.SetCounter(ctx, "testCounter", 1)
 	require.NoError(t, err)
 
-	err = strg.SetGauge("testGauge", 3.14)
+	err = strg.SetGauge(ctx, "testGauge", 3.14)
 	require.NoError(t, err)
 
 	h := NewHandlers(strg)
@@ -364,10 +368,12 @@ func TestGetMetricJSONHandler(t *testing.T) {
 
 	strg := storage.NewMemStorage()
 
-	err := strg.SetCounter("testCounter", 1)
+	ctx := context.Background()
+
+	err := strg.SetCounter(ctx, "testCounter", 1)
 	require.NoError(t, err)
 
-	err = strg.SetGauge("testGauge", 3.14)
+	err = strg.SetGauge(ctx, "testGauge", 3.14)
 	require.NoError(t, err)
 
 	h := NewHandlers(strg)
