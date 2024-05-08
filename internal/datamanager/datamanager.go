@@ -41,7 +41,10 @@ func (d *DataSaver) Close() error {
 func (d *DataSaver) Save() error {
 	ctx := context.TODO()
 
-	data := d.storage.GetAllMetrics(ctx)
+	data, err := d.storage.GetAllMetrics(ctx)
+	if err != nil {
+		return fmt.Errorf("storage.GetAllMetrics: %w", err)
+	}
 
 	d.encoder.SetIndent("", "\t")
 
