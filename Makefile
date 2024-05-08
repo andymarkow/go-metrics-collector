@@ -6,8 +6,9 @@
 
 .EXPORT_ALL_VARIABLES:
 
-FILE_STORAGE_PATH=metrics-db.json
+RESTORE=false
 STORE_INTERVAL=10
+FILE_STORAGE_PATH=
 DATABASE_DSN=postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
 
 .PHONY: all
