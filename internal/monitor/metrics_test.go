@@ -47,7 +47,7 @@ func TestMetrics(t *testing.T) {
 	testCases := []struct {
 		name   string
 		want   want
-		metric metric
+		metric Metric
 	}{
 		{
 			name:   "Alloc",

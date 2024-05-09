@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"runtime"
 
 	"github.com/andymarkow/go-metrics-collector/internal/httpclient"
@@ -11,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type metric interface {
+type Metric interface {
 	Collect()
 	GetName() string
 	GetKind() string
@@ -19,7 +20,7 @@ type metric interface {
 	GetValueString() string
 }
 
-type reseter interface {
+type Reseter interface {
 	Reset()
 }
 
@@ -27,13 +28,13 @@ type Monitor struct {
 	log     *zap.Logger
 	client  *httpclient.HTTPClient
 	memstat *runtime.MemStats
-	metrics []metric
+	metrics []Metric
 }
 
 func NewMonitor(opts ...Option) *Monitor {
 	var memstat runtime.MemStats
 
-	metrics := make([]metric, 0)
+	metrics := make([]Metric, 0)
 
 	metrics = append(metrics,
 		newAllocMetric(&memstat),
@@ -109,30 +110,11 @@ func (m *Monitor) Collect() {
 }
 
 func (m *Monitor) Push() {
+	var metrics []models.Metrics
+
+	batchSize := 100
+
 	for _, v := range m.metrics {
-		_, err := m.client.R().SetPathParams(map[string]string{
-			"metricType":  v.GetKind(),
-			"metricName":  v.GetName(),
-			"metricValue": v.GetValueString(),
-		}).SetHeader("Content-Type", "text/plain").
-			Post("/update/{metricType}/{metricName}/{metricValue}")
-
-		if err != nil {
-			m.log.Error("client.Request: " + err.Error())
-
-			continue
-		}
-
-		if c, ok := v.(reseter); ok {
-			c.Reset()
-		}
-	}
-}
-
-func (m *Monitor) PushJSON() {
-	for _, v := range m.metrics {
-		var payload models.Metrics
-
 		switch v.GetKind() {
 		case string(MetricCounter):
 			val, ok := v.GetValue().(int64)
@@ -142,11 +124,11 @@ func (m *Monitor) PushJSON() {
 				continue
 			}
 
-			payload = models.Metrics{
+			metrics = append(metrics, models.Metrics{
 				ID:    v.GetName(),
 				MType: v.GetKind(),
 				Delta: &val,
-			}
+			})
 
 		case string(MetricGauge):
 			val, ok := v.GetValue().(float64)
@@ -156,47 +138,60 @@ func (m *Monitor) PushJSON() {
 				continue
 			}
 
-			payload = models.Metrics{
+			metrics = append(metrics, models.Metrics{
 				ID:    v.GetName(),
 				MType: v.GetKind(),
 				Value: &val,
+			})
+		}
+
+		// Batch limit
+		if len(metrics) >= batchSize {
+			if err := m.sendRequest(metrics); err != nil {
+				m.log.Error("sendRequest: " + err.Error())
+
+				continue
 			}
+
+			// Flush slice
+			metrics = metrics[:0]
 		}
 
-		m.log.Sugar().Debug("payload: ", payload)
-
-		jsonPayload, err := json.Marshal(payload)
-		if err != nil {
-			m.log.Error("json.Marshal: " + err.Error())
-
-			continue
-		}
-
-		buf := bytes.NewBuffer(nil)
-		zbuf := gzip.NewWriter(buf)
-		defer zbuf.Close()
-
-		if _, err := zbuf.Write(jsonPayload); err != nil {
-			m.log.Error("zbuf.Write: " + err.Error())
-
-			continue
-		}
-		zbuf.Flush()
-
-		_, err = m.client.R().
-			SetHeader("Content-Type", "application/json").
-			SetHeader("Content-Encoding", "gzip").
-			SetBody(buf.Bytes()).
-			Post("/update")
-
-		if err != nil {
-			m.log.Error("client.Request: " + err.Error())
-
-			continue
-		}
-
-		if c, ok := v.(reseter); ok {
+		if c, ok := v.(Reseter); ok {
 			c.Reset()
 		}
 	}
+
+	if len(metrics) > 0 {
+		if err := m.sendRequest(metrics); err != nil {
+			m.log.Error("sendRequest: " + err.Error())
+		}
+	}
+}
+
+func (m *Monitor) sendRequest(metrics []models.Metrics) error {
+	payload, err := json.Marshal(metrics)
+	if err != nil {
+		return fmt.Errorf("json.Marshal: %w", err)
+	}
+
+	buf := bytes.NewBuffer(nil)
+	zbuf := gzip.NewWriter(buf)
+	defer zbuf.Close()
+
+	if _, err := zbuf.Write(payload); err != nil {
+		return fmt.Errorf("zbuf.Write: %w", err)
+	}
+	zbuf.Flush()
+
+	_, err = m.client.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Content-Encoding", "gzip").
+		SetBody(buf.Bytes()).
+		Post("/updates")
+	if err != nil {
+		return fmt.Errorf("client.Request: %w", err)
+	}
+
+	return nil
 }

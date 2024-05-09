@@ -53,8 +53,9 @@ func newRouter(strg storage.Storage, opts ...Option) chiRouter {
 	})
 
 	r.Group(func(r chi.Router) {
-		r.Post("/update", h.UpdateMetricJSON)
 		r.Post("/value", h.GetMetricJSON)
+		r.Post("/update", h.UpdateMetricJSON)
+		r.Post("/updates", h.UpdateMetricsJSON)
 	})
 
 	return r

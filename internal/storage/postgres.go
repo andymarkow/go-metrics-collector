@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"time"
 
+	"github.com/andymarkow/go-metrics-collector/internal/models"
 	"github.com/pressly/goose/v3"
 
 	// Postgresql driver.
@@ -23,6 +25,11 @@ func NewPostgresStorage(connStr string) (*PostgresStorage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("sql.Open: %w", err)
 	}
+
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxIdleTime(180 * time.Second)
+	db.SetConnMaxLifetime(3600 * time.Second)
 
 	return &PostgresStorage{
 		db: db,
@@ -130,9 +137,7 @@ func (pg *PostgresStorage) GetAllMetrics(ctx context.Context) (map[string]Metric
 }
 
 func (pg *PostgresStorage) GetCounter(ctx context.Context, name string) (int64, error) {
-	query := `SELECT value FROM metric_counters WHERE name = $1;`
-
-	stmt, err := pg.db.PrepareContext(ctx, query)
+	stmt, err := pg.db.PrepareContext(ctx, "SELECT value FROM metric_counters WHERE name = $1;")
 	if err != nil {
 		return 0, fmt.Errorf("db.PrepareContext: %w", err)
 	}
@@ -202,6 +207,54 @@ func (pg *PostgresStorage) SetGauge(ctx context.Context, name string, value floa
 	_, err = stmt.ExecContext(ctx, name, value)
 	if err != nil {
 		return fmt.Errorf("stmt.ExecContext: %w", err)
+	}
+
+	return nil
+}
+
+func (pg *PostgresStorage) SetMetrics(ctx context.Context, metrics []models.Metrics) error {
+	tx, err := pg.db.Begin()
+	if err != nil {
+		return fmt.Errorf("db.Begin: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	counterStmt, err := tx.PrepareContext(ctx,
+		"INSERT INTO metric_counters (name, value) VALUES ($1, $2)"+
+			"ON CONFLICT (name) DO UPDATE SET value = metric_counters.value + $2;")
+	if err != nil {
+		return fmt.Errorf("tx.PrepareContext: %w", err)
+	}
+	defer counterStmt.Close()
+
+	gaugeStmt, err := tx.PrepareContext(ctx,
+		"INSERT INTO metric_gauges (name, value) VALUES ($1, $2)"+
+			"ON CONFLICT (name) DO UPDATE SET value = $2;")
+	if err != nil {
+		return fmt.Errorf("tx.PrepareContext: %w", err)
+	}
+	defer gaugeStmt.Close()
+
+	for _, metric := range metrics {
+		switch metric.MType {
+		case "counter":
+			_, err := counterStmt.ExecContext(ctx, metric.ID, *metric.Delta)
+			if err != nil {
+				return fmt.Errorf("counterStmt.ExecContext: %w", err)
+			}
+
+		case "gauge":
+			_, err := gaugeStmt.ExecContext(ctx, metric.ID, *metric.Value)
+			if err != nil {
+				return fmt.Errorf("gaugeStmt.ExecContext: %w", err)
+			}
+		default:
+			return fmt.Errorf("unknown metric type: %s", metric.MType)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("tx.Commit: %w", err)
 	}
 
 	return nil

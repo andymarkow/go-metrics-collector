@@ -24,3 +24,26 @@ func (m *Metrics) Validate() error {
 
 	return nil
 }
+
+func (m *Metrics) ValidateUpdate() error {
+	if m.ID == "" {
+		return errormsg.ErrMetricEmptyName
+	}
+
+	switch m.MType {
+	case "counter":
+		if m.Delta == nil {
+			return errormsg.ErrMetricEmptyDelta
+		}
+
+	case "gauge":
+		if m.Value == nil {
+			return errormsg.ErrMetricEmptyValue
+		}
+
+	default:
+		return errormsg.ErrMetricInvalidType
+	}
+
+	return nil
+}
