@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -146,7 +147,9 @@ func (pg *PostgresStorage) GetCounter(ctx context.Context, name string) (int64, 
 	row := stmt.QueryRowContext(ctx, name)
 
 	var value int64
-	if err := row.Scan(&value); err != nil {
+	if err := row.Scan(&value); errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrMetricNotFound
+	} else if err != nil {
 		return 0, fmt.Errorf("row.Scan: %w", err)
 	}
 
@@ -184,7 +187,9 @@ func (pg *PostgresStorage) GetGauge(ctx context.Context, name string) (float64, 
 	row := stmt.QueryRowContext(ctx, name)
 
 	var value float64
-	if err := row.Scan(&value); err != nil {
+	if err := row.Scan(&value); errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrMetricNotFound
+	} else if err != nil {
 		return 0, fmt.Errorf("row.Scan: %w", err)
 	}
 
