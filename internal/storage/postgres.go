@@ -68,6 +68,8 @@ func (pg *PostgresStorage) Ping(ctx context.Context) error {
 		return fmt.Errorf("db.PingContext: %w", err)
 	}
 
+	// pg.db.
+
 	return nil
 }
 
@@ -253,6 +255,7 @@ func (pg *PostgresStorage) SetMetrics(ctx context.Context, metrics []models.Metr
 			if err != nil {
 				return fmt.Errorf("gaugeStmt.ExecContext: %w", err)
 			}
+
 		default:
 			return fmt.Errorf("unknown metric type: %s", metric.MType)
 		}

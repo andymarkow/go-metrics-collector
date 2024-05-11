@@ -4,11 +4,16 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"runtime"
+	"syscall"
+	"time"
 
 	"github.com/andymarkow/go-metrics-collector/internal/httpclient"
 	"github.com/andymarkow/go-metrics-collector/internal/models"
+	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
 )
 
@@ -82,7 +87,25 @@ func NewMonitor(opts ...Option) *Monitor {
 		opt(mon)
 	}
 
+	// Configure the retry mechanism
+	client.
+		SetLogger(mon.log.Sugar()).
+		SetRetryCount(3).                  // Number of retry attempts
+		SetRetryWaitTime(1 * time.Second). // Initial wait time between retries
+		SetRetryMaxWaitTime(10 * time.Second).
+		SetRetryAfter(retryAfterWithInterval(2)).
+		AddRetryCondition(func(_ *resty.Response, err error) bool {
+			// Retry for network errors
+			return isNetworkError(err)
+		})
+
 	return mon
+}
+
+func retryAfterWithInterval(retryWaitInterval int) resty.RetryAfterFunc {
+	return func(_ *resty.Client, resp *resty.Response) (time.Duration, error) {
+		return time.Duration((resp.Request.Attempt*retryWaitInterval - 1)) * time.Second, nil
+	}
 }
 
 // Option is a monitor option.
@@ -184,6 +207,24 @@ func (m *Monitor) sendRequest(metrics []models.Metrics) error {
 	}
 	zbuf.Flush()
 
+	// Retry logic
+
+	// Retry count
+	// retryCount := 3
+
+	// Initial retry wait time
+	// retryWaitTime := 1 * time.Second
+
+	// Define the interval between retries
+	// retryWaitInterval := 2
+
+	// for i := 0; i < retryCount; i++ {
+	// 	retryWaitTime = time.Duration((i*retryWaitInterval + 1)) * time.Second
+	// 	fmt.Printf("%v\n", retryWaitTime)
+	// }
+
+	// m.log.Info("first request")
+
 	_, err = m.client.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Content-Encoding", "gzip").
@@ -194,4 +235,40 @@ func (m *Monitor) sendRequest(metrics []models.Metrics) error {
 	}
 
 	return nil
+}
+
+// isNetworkError checks if the error is a network-related error.
+func isNetworkError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		// Connection refused error
+		return true
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		if netErr.Timeout() {
+			// Connection timeout error
+			return true
+		}
+	}
+
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		// DNS error
+		return true
+	}
+
+	var addrErr *net.AddrError
+	if errors.As(err, &addrErr) {
+		// Address error
+		return true
+	}
+
+	var opErr *net.OpError
+
+	return errors.As(err, &opErr)
 }
