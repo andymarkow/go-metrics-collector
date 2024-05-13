@@ -207,24 +207,6 @@ func (m *Monitor) sendRequest(metrics []models.Metrics) error {
 	}
 	zbuf.Flush()
 
-	// Retry logic
-
-	// Retry count
-	// retryCount := 3
-
-	// Initial retry wait time
-	// retryWaitTime := 1 * time.Second
-
-	// Define the interval between retries
-	// retryWaitInterval := 2
-
-	// for i := 0; i < retryCount; i++ {
-	// 	retryWaitTime = time.Duration((i*retryWaitInterval + 1)) * time.Second
-	// 	fmt.Printf("%v\n", retryWaitTime)
-	// }
-
-	// m.log.Info("first request")
-
 	_, err = m.client.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Content-Encoding", "gzip").

@@ -6,10 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"syscall"
 	"time"
 
 	"github.com/andymarkow/go-metrics-collector/internal/models"
 	"github.com/pressly/goose/v3"
+
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	// Postgresql driver.
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -67,8 +71,6 @@ func (pg *PostgresStorage) Ping(ctx context.Context) error {
 	if err := pg.db.PingContext(ctx); err != nil {
 		return fmt.Errorf("db.PingContext: %w", err)
 	}
-
-	// pg.db.
 
 	return nil
 }
@@ -140,19 +142,28 @@ func (pg *PostgresStorage) GetAllMetrics(ctx context.Context) (map[string]Metric
 }
 
 func (pg *PostgresStorage) GetCounter(ctx context.Context, name string) (int64, error) {
-	stmt, err := pg.db.PrepareContext(ctx, "SELECT value FROM metric_counters WHERE name = $1;")
-	if err != nil {
-		return 0, fmt.Errorf("db.PrepareContext: %w", err)
-	}
-	defer stmt.Close()
-
-	row := stmt.QueryRowContext(ctx, name)
-
 	var value int64
-	if err := row.Scan(&value); errors.Is(err, sql.ErrNoRows) {
-		return 0, ErrMetricNotFound
-	} else if err != nil {
-		return 0, fmt.Errorf("row.Scan: %w", err)
+
+	err := WithRetry(func() error {
+		stmt, err := pg.db.PrepareContext(ctx, "SELECT value FROM metric_counters WHERE name = $1;")
+		if err != nil {
+			return fmt.Errorf("db.PrepareContext: %w", err)
+		}
+		defer stmt.Close()
+
+		row := stmt.QueryRowContext(ctx, name)
+
+		err = row.Scan(&value)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrMetricNotFound
+		} else if err != nil {
+			return fmt.Errorf("row.Scan: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return 0, err
 	}
 
 	return value, nil
@@ -271,4 +282,51 @@ func (pg *PostgresStorage) SetMetrics(ctx context.Context, metrics []models.Metr
 // LoadData is a stub to keep compatibility with Storage interface.
 func (pg *PostgresStorage) LoadData(_ context.Context, _ map[string]Metric) error {
 	return nil
+}
+
+// WithRetry retries operations in case of retryable errors.
+func WithRetry(operation func() error) error {
+	// Retry count
+	retryCount := 3
+
+	// Initial retry wait time
+	var retryWaitTime time.Duration
+
+	// Define the interval between retries
+	retryWaitInterval := 2
+
+	var err error
+
+	for i := 0; i < retryCount; i++ {
+		err = operation()
+		if err == nil {
+			return nil
+		}
+
+		if isRetryableError(err) {
+			retryWaitTime = time.Duration((i*retryWaitInterval + 1)) * time.Second // 1s, 3s, 5s, etc.
+
+			time.Sleep(retryWaitTime)
+		} else {
+			return fmt.Errorf("%w", err)
+		}
+	}
+
+	return fmt.Errorf("retry attempts exceeded: %w", err)
+}
+
+// isRetryableError checks if error is retryable.
+func isRetryableError(err error) bool {
+	// Connection refused error
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return true
+	}
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgerrcode.IsConnectionException(pgErr.Code) {
+		// https://github.com/jackc/pgerrcode/blob/6e2875d9b438d43808cc033afe2d978db3b9c9e7/errcode.go#L393C6-L393C27
+		return true
+	}
+
+	return false
 }
