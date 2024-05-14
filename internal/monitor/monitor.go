@@ -87,7 +87,7 @@ func NewMonitor(opts ...Option) *Monitor {
 		opt(mon)
 	}
 
-	// Configure the retry mechanism
+	// Configure the retry strategy
 	client.
 		SetLogger(mon.log.Sugar()).
 		SetRetryCount(3).                  // Number of retry attempts
@@ -95,13 +95,14 @@ func NewMonitor(opts ...Option) *Monitor {
 		SetRetryMaxWaitTime(10 * time.Second).
 		SetRetryAfter(retryAfterWithInterval(2)).
 		AddRetryCondition(func(_ *resty.Response, err error) bool {
-			// Retry for network errors
-			return isNetworkError(err)
+			// Retry for retryable errors
+			return isRetryableError(err)
 		})
 
 	return mon
 }
 
+// retryAfterWithInterval returns duration intervals between retries.
 func retryAfterWithInterval(retryWaitInterval int) resty.RetryAfterFunc {
 	return func(_ *resty.Client, resp *resty.Response) (time.Duration, error) {
 		return time.Duration((resp.Request.Attempt*retryWaitInterval - 1)) * time.Second, nil
@@ -124,6 +125,7 @@ func WithServerAddr(addr string) Option {
 	}
 }
 
+// Collect collects metrics.
 func (m *Monitor) Collect() {
 	runtime.ReadMemStats(m.memstat)
 
@@ -132,6 +134,7 @@ func (m *Monitor) Collect() {
 	}
 }
 
+// Push pushes metrics to the remote server.
 func (m *Monitor) Push() {
 	var metrics []models.Metrics
 
@@ -219,8 +222,8 @@ func (m *Monitor) sendRequest(metrics []models.Metrics) error {
 	return nil
 }
 
-// isNetworkError checks if the error is a network-related error.
-func isNetworkError(err error) bool {
+// isRetryableError checks if the error is a retryable error.
+func isRetryableError(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -250,6 +253,7 @@ func isNetworkError(err error) bool {
 		return true
 	}
 
+	// Operational error
 	var opErr *net.OpError
 
 	return errors.As(err, &opErr)

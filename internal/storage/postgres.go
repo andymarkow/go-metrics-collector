@@ -68,8 +68,15 @@ func (pg *PostgresStorage) Close() error {
 }
 
 func (pg *PostgresStorage) Ping(ctx context.Context) error {
-	if err := pg.db.PingContext(ctx); err != nil {
-		return fmt.Errorf("db.PingContext: %w", err)
+	err := WithRetry(func() error {
+		if err := pg.db.PingContext(ctx); err != nil {
+			return fmt.Errorf("db.PingContext: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -78,64 +85,71 @@ func (pg *PostgresStorage) Ping(ctx context.Context) error {
 func (pg *PostgresStorage) GetAllMetrics(ctx context.Context) (map[string]Metric, error) {
 	data := make(map[string]Metric)
 
-	countersStmt, err := pg.db.PrepareContext(ctx, "SELECT name, value FROM metric_counters;")
-	if err != nil {
-		return nil, fmt.Errorf("db.PrepareContext: %w", err)
-	}
-	defer countersStmt.Close()
+	err := WithRetry(func() error {
+		countersStmt, err := pg.db.PrepareContext(ctx, "SELECT name, value FROM metric_counters;")
+		if err != nil {
+			return fmt.Errorf("db.PrepareContext: %w", err)
+		}
+		defer countersStmt.Close()
 
-	counters, err := countersStmt.QueryContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("countersStmt.QueryContext: %w", err)
-	}
-	defer counters.Close()
+		counters, err := countersStmt.QueryContext(ctx)
+		if err != nil {
+			return fmt.Errorf("countersStmt.QueryContext: %w", err)
+		}
+		defer counters.Close()
 
-	for counters.Next() {
-		var name string
-		var value int64
+		for counters.Next() {
+			var name string
+			var value int64
 
-		if err := counters.Scan(&name, &value); err != nil {
-			return nil, fmt.Errorf("counters.Scan: %w", err)
+			if err := counters.Scan(&name, &value); err != nil {
+				return fmt.Errorf("counters.Scan: %w", err)
+			}
+
+			data[name] = Metric{
+				Type:  "counter",
+				Value: value,
+			}
 		}
 
-		data[name] = Metric{
-			Type:  "counter",
-			Value: value,
+		if err := counters.Err(); err != nil {
+			return fmt.Errorf("counters.Err: %w", err)
 		}
-	}
 
-	if err := counters.Err(); err != nil {
-		return nil, fmt.Errorf("counters.Err: %w", err)
-	}
+		gaugesStmt, err := pg.db.PrepareContext(ctx, "SELECT name, value FROM metric_gauges;")
+		if err != nil {
+			return fmt.Errorf("db.PrepareContext: %w", err)
+		}
+		defer gaugesStmt.Close()
 
-	gaugesStmt, err := pg.db.PrepareContext(ctx, "SELECT name, value FROM metric_gauges;")
+		gauges, err := gaugesStmt.QueryContext(ctx)
+		if err != nil {
+			return fmt.Errorf("gaugesStmt.QueryContext: %w", err)
+		}
+		defer gauges.Close()
+
+		for gauges.Next() {
+			var name string
+			var value float64
+
+			if err := gauges.Scan(&name, &value); err != nil {
+				return fmt.Errorf("gauges.Scan: %w", err)
+			}
+
+			data[name] = Metric{
+				Type:  "gauge",
+				Value: value,
+			}
+		}
+
+		if err := gauges.Err(); err != nil {
+			return fmt.Errorf("gauges.Err: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("db.PrepareContext: %w", err)
-	}
-	defer gaugesStmt.Close()
-
-	gauges, err := gaugesStmt.QueryContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("gaugesStmt.QueryContext: %w", err)
-	}
-	defer gauges.Close()
-
-	for gauges.Next() {
-		var name string
-		var value float64
-
-		if err := gauges.Scan(&name, &value); err != nil {
-			return nil, fmt.Errorf("gauges.Scan: %w", err)
-		}
-
-		data[name] = Metric{
-			Type:  "gauge",
-			Value: value,
-		}
-	}
-
-	if err := gauges.Err(); err != nil {
-		return nil, fmt.Errorf("gauges.Err: %w", err)
+		return nil, err
 	}
 
 	return data, nil
@@ -176,34 +190,49 @@ func (pg *PostgresStorage) SetCounter(ctx context.Context, name string, value in
 		ON CONFLICT (name)
 		DO UPDATE SET value = metric_counters.value + $2;`
 
-	stmt, err := pg.db.PrepareContext(ctx, query)
-	if err != nil {
-		return fmt.Errorf("db.PrepareContext: %w", err)
-	}
-	defer stmt.Close()
+	err := WithRetry(func() error {
+		stmt, err := pg.db.PrepareContext(ctx, query)
+		if err != nil {
+			return fmt.Errorf("db.PrepareContext: %w", err)
+		}
+		defer stmt.Close()
 
-	_, err = stmt.ExecContext(ctx, name, value)
+		_, err = stmt.ExecContext(ctx, name, value)
+		if err != nil {
+			return fmt.Errorf("stmt.ExecContext: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("stmt.ExecContext: %w", err)
+		return err
 	}
 
 	return nil
 }
 
 func (pg *PostgresStorage) GetGauge(ctx context.Context, name string) (float64, error) {
-	stmt, err := pg.db.PrepareContext(ctx, "SELECT value FROM metric_gauges WHERE name = $1;")
-	if err != nil {
-		return 0, fmt.Errorf("db.PrepareContext: %w", err)
-	}
-	defer stmt.Close()
-
-	row := stmt.QueryRowContext(ctx, name)
-
 	var value float64
-	if err := row.Scan(&value); errors.Is(err, sql.ErrNoRows) {
-		return 0, ErrMetricNotFound
-	} else if err != nil {
-		return 0, fmt.Errorf("row.Scan: %w", err)
+
+	err := WithRetry(func() error {
+		stmt, err := pg.db.PrepareContext(ctx, "SELECT value FROM metric_gauges WHERE name = $1;")
+		if err != nil {
+			return fmt.Errorf("db.PrepareContext: %w", err)
+		}
+		defer stmt.Close()
+
+		row := stmt.QueryRowContext(ctx, name)
+
+		if err := row.Scan(&value); errors.Is(err, sql.ErrNoRows) {
+			return ErrMetricNotFound
+		} else if err != nil {
+			return fmt.Errorf("row.Scan: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return 0, err
 	}
 
 	return value, nil
@@ -216,64 +245,78 @@ func (pg *PostgresStorage) SetGauge(ctx context.Context, name string, value floa
 		ON CONFLICT (name)
 		DO UPDATE SET value = $2;`
 
-	stmt, err := pg.db.PrepareContext(ctx, query)
-	if err != nil {
-		return fmt.Errorf("db.PrepareContext: %w", err)
-	}
-	defer stmt.Close()
+	err := WithRetry(func() error {
+		stmt, err := pg.db.PrepareContext(ctx, query)
+		if err != nil {
+			return fmt.Errorf("db.PrepareContext: %w", err)
+		}
+		defer stmt.Close()
 
-	_, err = stmt.ExecContext(ctx, name, value)
+		_, err = stmt.ExecContext(ctx, name, value)
+		if err != nil {
+			return fmt.Errorf("stmt.ExecContext: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("stmt.ExecContext: %w", err)
+		return err
 	}
 
 	return nil
 }
 
 func (pg *PostgresStorage) SetMetrics(ctx context.Context, metrics []models.Metrics) error {
-	tx, err := pg.db.Begin()
-	if err != nil {
-		return fmt.Errorf("db.Begin: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-
-	counterStmt, err := tx.PrepareContext(ctx,
-		"INSERT INTO metric_counters (name, value) VALUES ($1, $2)"+
-			"ON CONFLICT (name) DO UPDATE SET value = metric_counters.value + $2;")
-	if err != nil {
-		return fmt.Errorf("tx.PrepareContext: %w", err)
-	}
-	defer counterStmt.Close()
-
-	gaugeStmt, err := tx.PrepareContext(ctx,
-		"INSERT INTO metric_gauges (name, value) VALUES ($1, $2)"+
-			"ON CONFLICT (name) DO UPDATE SET value = $2;")
-	if err != nil {
-		return fmt.Errorf("tx.PrepareContext: %w", err)
-	}
-	defer gaugeStmt.Close()
-
-	for _, metric := range metrics {
-		switch metric.MType {
-		case "counter":
-			_, err := counterStmt.ExecContext(ctx, metric.ID, *metric.Delta)
-			if err != nil {
-				return fmt.Errorf("counterStmt.ExecContext: %w", err)
-			}
-
-		case "gauge":
-			_, err := gaugeStmt.ExecContext(ctx, metric.ID, *metric.Value)
-			if err != nil {
-				return fmt.Errorf("gaugeStmt.ExecContext: %w", err)
-			}
-
-		default:
-			return fmt.Errorf("unknown metric type: %s", metric.MType)
+	err := WithRetry(func() error {
+		tx, err := pg.db.Begin()
+		if err != nil {
+			return fmt.Errorf("db.Begin: %w", err)
 		}
-	}
+		defer tx.Rollback() //nolint:errcheck
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("tx.Commit: %w", err)
+		counterStmt, err := tx.PrepareContext(ctx,
+			"INSERT INTO metric_counters (name, value) VALUES ($1, $2)"+
+				"ON CONFLICT (name) DO UPDATE SET value = metric_counters.value + $2;")
+		if err != nil {
+			return fmt.Errorf("tx.PrepareContext: %w", err)
+		}
+		defer counterStmt.Close()
+
+		gaugeStmt, err := tx.PrepareContext(ctx,
+			"INSERT INTO metric_gauges (name, value) VALUES ($1, $2)"+
+				"ON CONFLICT (name) DO UPDATE SET value = $2;")
+		if err != nil {
+			return fmt.Errorf("tx.PrepareContext: %w", err)
+		}
+		defer gaugeStmt.Close()
+
+		for _, metric := range metrics {
+			switch metric.MType {
+			case "counter":
+				_, err := counterStmt.ExecContext(ctx, metric.ID, *metric.Delta)
+				if err != nil {
+					return fmt.Errorf("counterStmt.ExecContext: %w", err)
+				}
+
+			case "gauge":
+				_, err := gaugeStmt.ExecContext(ctx, metric.ID, *metric.Value)
+				if err != nil {
+					return fmt.Errorf("gaugeStmt.ExecContext: %w", err)
+				}
+
+			default:
+				return fmt.Errorf("unknown metric type: %s", metric.MType)
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("tx.Commit: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	return nil
