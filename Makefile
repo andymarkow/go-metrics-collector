@@ -6,8 +6,10 @@
 
 .EXPORT_ALL_VARIABLES:
 
-FILE_STORAGE_PATH=metrics-db.json
+RESTORE=false
 STORE_INTERVAL=10
+FILE_STORAGE_PATH=
+DATABASE_DSN=postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
 
 .PHONY: all
 
@@ -24,6 +26,12 @@ run-server:
 
 run-agent:
 	go run ./cmd/agent
+
+run-postgres:
+	docker-compose up postgres pgadmin
+
+stop-postgres:
+	docker-compose down postgres pgadmin
 
 lint:
 	docker run --rm --name golangci-lint -v `pwd`:/workspace -w /workspace \

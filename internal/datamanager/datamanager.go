@@ -1,6 +1,7 @@
 package datamanager
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -37,6 +38,20 @@ func (d *DataSaver) Close() error {
 	return nil
 }
 
+func (d *DataSaver) Save() error {
+	ctx := context.TODO()
+
+	data := d.storage.GetAllMetrics(ctx)
+
+	d.encoder.SetIndent("", "\t")
+
+	if err := d.encoder.Encode(&data); err != nil {
+		return fmt.Errorf("encoder.Encode: %w", err)
+	}
+
+	return nil
+}
+
 func (d *DataSaver) PurgeAndSave() error {
 	if err := d.file.Truncate(0); err != nil {
 		return fmt.Errorf("file.Truncate: %w", err)
@@ -48,18 +63,6 @@ func (d *DataSaver) PurgeAndSave() error {
 
 	if err := d.Save(); err != nil {
 		return fmt.Errorf("d.Save: %w", err)
-	}
-
-	return nil
-}
-
-func (d *DataSaver) Save() error {
-	data := d.storage.GetAllMetrics()
-
-	d.encoder.SetIndent("", "\t")
-
-	if err := d.encoder.Encode(&data); err != nil {
-		return fmt.Errorf("encoder.Encode: %w", err)
 	}
 
 	return nil
@@ -106,7 +109,9 @@ func (d *DataLoader) Load() error {
 		return fmt.Errorf("decoder.Decode: %w", err)
 	}
 
-	if err := d.storage.LoadData(data); err != nil {
+	ctx := context.TODO()
+
+	if err := d.storage.LoadData(ctx, data); err != nil {
 		return fmt.Errorf("storage.LoadData: %w", err)
 	}
 

@@ -26,3 +26,4 @@ vendor/
 
 .coverage.cov
 metrics-db.json
+pgdata

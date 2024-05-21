@@ -44,6 +44,7 @@ func newRouter(strg storage.Storage, opts ...Option) chiRouter {
 	)
 
 	r.Get("/", h.GetAllMetrics)
+	r.Get("/ping", h.Ping)
 
 	r.Group(func(r chi.Router) {
 		r.Use(mw.MetricValidator)

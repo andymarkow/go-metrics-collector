@@ -1,10 +1,12 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -18,10 +20,10 @@ import (
 type Server struct {
 	srv           *http.Server
 	log           *zap.Logger
+	storage       storage.Storage
 	storeInterval time.Duration
+	storeFile     string
 	restoreOnBoot bool
-	dataLoader    *datamanager.DataLoader
-	dataSaver     *datamanager.DataSaver
 }
 
 func NewServer() (*Server, error) {
@@ -35,19 +37,18 @@ func NewServer() (*Server, error) {
 		return nil, fmt.Errorf("logger.NewZapLogger: %w", err)
 	}
 
-	strg := storage.NewStorage(storage.NewMemStorage())
+	var strg storage.Storage = storage.NewMemStorage()
 
-	dl, err := datamanager.NewDataLoader(cfg.StoreFile, strg)
-	if err != nil {
-		return nil, fmt.Errorf("datamanager.NewDataManager: %w", err)
+	if cfg.DatabaseDSN != "" {
+		strg, err = storage.NewPostgresStorage(cfg.DatabaseDSN)
+		if err != nil {
+			return nil, fmt.Errorf("storage.NewPostgresStorage: %w", err)
+		}
 	}
 
-	ds, err := datamanager.NewDataSaver(cfg.StoreFile, strg)
-	if err != nil {
-		return nil, fmt.Errorf("datamanager.NewDataSaver: %w", err)
-	}
+	store := storage.NewStorage(strg)
 
-	r := newRouter(strg, WithLogger(log))
+	r := newRouter(store, WithLogger(log))
 
 	srv := &http.Server{
 		Addr:              cfg.ServerAddr,
@@ -61,53 +62,96 @@ func NewServer() (*Server, error) {
 		srv:           srv,
 		log:           log,
 		restoreOnBoot: cfg.RestoreOnBoot,
+		storage:       store,
 		storeInterval: time.Duration(cfg.StoreInterval) * time.Second,
-		dataLoader:    dl,
-		dataSaver:     ds,
+		storeFile:     cfg.StoreFile,
 	}, nil
 }
 
-func (s *Server) Close() error {
-	if err := s.dataSaver.Close(); err != nil {
-		return fmt.Errorf("dataSaver.Close: %w", err)
+func (s *Server) Close() {
+	if err := s.storage.Close(); err != nil {
+		s.log.Error("storage.Close", zap.Error(err))
+	}
+}
+
+func (s *Server) LoadDataFromFile() error {
+	dataLoader, err := datamanager.NewDataLoader(s.storeFile, s.storage)
+	if err != nil {
+		return fmt.Errorf("datamanager.NewDataManager: %w", err)
+	}
+	defer dataLoader.Close()
+
+	s.log.Sugar().Infof("Loading metrics data from file '%s'", dataLoader.GetFilename())
+
+	if err := dataLoader.Load(); err != nil {
+		return fmt.Errorf("dataLoader.Load: %w", err)
 	}
 
 	return nil
 }
 
-func (s *Server) LoadData() error {
-	defer s.dataLoader.Close()
-	if s.restoreOnBoot {
-		s.log.Sugar().Infof("Loading metrics data from file '%s'", s.dataLoader.GetFilename())
+func (s *Server) SaveDataToFile(ctx context.Context, wg *sync.WaitGroup) error {
+	defer wg.Done()
 
-		if err := s.dataLoader.Load(); err != nil {
-			return fmt.Errorf("dataLoader.Load: %w", err)
+	dataSaver, err := datamanager.NewDataSaver(s.storeFile, s.storage)
+	if err != nil {
+		return fmt.Errorf("datamanager.NewDataSaver: %w", err)
+	}
+	defer dataSaver.Close()
+
+	storeTicker := time.NewTicker(s.storeInterval)
+	defer storeTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			if err := dataSaver.PurgeAndSave(); err != nil { //nolint:contextcheck
+				return fmt.Errorf("dataSaver.PurgeAndSave: %w", err)
+			}
+
+			return nil
+
+		case <-storeTicker.C:
+			if err := dataSaver.PurgeAndSave(); err != nil { //nolint:contextcheck
+				s.log.Sugar().Errorf("dataSaver.PurgeAndSave: %v", err)
+			}
 		}
 	}
-
-	return nil
 }
 
 func (s *Server) Start() error {
 	defer s.Close()
 
-	if err := s.LoadData(); err != nil {
-		return fmt.Errorf("server.LoadData: %w", err)
+	if s.restoreOnBoot {
+		if err := s.LoadDataFromFile(); err != nil {
+			return fmt.Errorf("server.LoadData: %w", err)
+		}
 	}
 
-	s.log.Sugar().Infof("Starting server on '%s'", s.srv.Addr)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	errChan := make(chan error, 1)
 
+	wg := &sync.WaitGroup{}
+
+	if s.storeFile != "" {
+		wg.Add(1)
+
+		go func() {
+			if err := s.SaveDataToFile(ctx, wg); err != nil {
+				errChan <- fmt.Errorf("server.SaveData: %w", err)
+			}
+		}()
+	}
+
 	go func() {
+		s.log.Sugar().Infof("Starting server on '%s'", s.srv.Addr)
+
 		if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errChan <- fmt.Errorf("server.ListenAndServe: %w", err)
 		}
 	}()
-
-	storeTicker := time.NewTicker(s.storeInterval)
-
-	defer storeTicker.Stop()
 
 	// Graceful shutdown handler
 	quit := make(chan os.Signal, 1)
@@ -121,16 +165,11 @@ func (s *Server) Start() error {
 		case <-quit:
 			s.log.Sugar().Infof("Gracefully shutting down server...")
 
-			if err := s.dataSaver.PurgeAndSave(); err != nil {
-				return fmt.Errorf("dataSaver.PurgeAndSave: %w", err)
-			}
+			cancel()
+
+			wg.Wait()
 
 			return nil
-
-		case <-storeTicker.C:
-			if err := s.dataSaver.PurgeAndSave(); err != nil {
-				s.log.Sugar().Errorf("dataSaver.PurgeAndSave: %v", err)
-			}
 		}
 	}
 }
