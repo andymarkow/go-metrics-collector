@@ -85,7 +85,14 @@ func (h *Handlers) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 
 	result := make([]string, 0)
 
-	for k, v := range h.storage.GetAllMetrics(ctx) {
+	data, err := h.storage.GetAllMetrics(ctx)
+	if err != nil {
+		h.handleError(w, err, http.StatusInternalServerError)
+
+		return
+	}
+
+	for k, v := range data {
 		result = append(result, fmt.Sprintf("%s %s", k, v.StringValue()))
 	}
 

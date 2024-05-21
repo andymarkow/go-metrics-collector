@@ -131,11 +131,11 @@ func (s *MemStorage) SetGauge(_ context.Context, name string, value float64) err
 	return nil
 }
 
-func (s *MemStorage) GetAllMetrics(_ context.Context) map[string]Metric {
+func (s *MemStorage) GetAllMetrics(_ context.Context) (map[string]Metric, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.data
+	return s.data, nil
 }
 
 func (s *MemStorage) LoadData(_ context.Context, data map[string]Metric) error {

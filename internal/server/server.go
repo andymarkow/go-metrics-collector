@@ -40,10 +40,18 @@ func NewServer() (*Server, error) {
 	var strg storage.Storage = storage.NewMemStorage()
 
 	if cfg.DatabaseDSN != "" {
-		strg, err = storage.NewPostgresStorage(cfg.DatabaseDSN)
+		pgStorage, err := storage.NewPostgresStorage(cfg.DatabaseDSN)
 		if err != nil {
 			return nil, fmt.Errorf("storage.NewPostgresStorage: %w", err)
 		}
+
+		ctx := context.TODO()
+
+		if err := pgStorage.Bootstrap(ctx); err != nil {
+			return nil, fmt.Errorf("pgStorage.Bootstrap: %w", err)
+		}
+
+		strg = pgStorage
 	}
 
 	store := storage.NewStorage(strg)
@@ -137,6 +145,8 @@ func (s *Server) Start() error {
 
 	if s.storeFile != "" {
 		wg.Add(1)
+
+		s.log.Sugar().Infof("Saving data to file '%s' every %s", s.storeFile, s.storeInterval.String())
 
 		go func() {
 			if err := s.SaveDataToFile(ctx, wg); err != nil {

@@ -12,7 +12,7 @@ var (
 )
 
 type Storage interface {
-	GetAllMetrics(ctx context.Context) map[string]Metric
+	GetAllMetrics(ctx context.Context) (map[string]Metric, error)
 	GetCounter(ctx context.Context, name string) (int64, error)
 	SetCounter(ctx context.Context, name string, value int64) error
 	GetGauge(ctx context.Context, name string) (float64, error)
