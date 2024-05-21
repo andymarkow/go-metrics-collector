@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/andymarkow/go-metrics-collector/internal/models"
 	"github.com/andymarkow/go-metrics-collector/internal/monitor"
 )
 
@@ -56,6 +57,13 @@ func (s *MemStorage) Close() error {
 
 func (s *MemStorage) Ping(_ context.Context) error {
 	return nil
+}
+
+func (s *MemStorage) GetAllMetrics(_ context.Context) (map[string]Metric, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.data, nil
 }
 
 func (s *MemStorage) GetCounter(_ context.Context, name string) (int64, error) {
@@ -131,11 +139,22 @@ func (s *MemStorage) SetGauge(_ context.Context, name string, value float64) err
 	return nil
 }
 
-func (s *MemStorage) GetAllMetrics(_ context.Context) (map[string]Metric, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (s *MemStorage) SetMetrics(ctx context.Context, metrics []models.Metrics) error {
+	for _, metric := range metrics {
+		switch metric.MType {
+		case "counter":
+			if err := s.SetCounter(ctx, metric.ID, *metric.Delta); err != nil {
+				return fmt.Errorf("failed to set metric (%s): %w", metric.ID, err)
+			}
 
-	return s.data, nil
+		case "gauge":
+			if err := s.SetGauge(ctx, metric.ID, *metric.Value); err != nil {
+				return fmt.Errorf("failed to set metric (%s): %w", metric.ID, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *MemStorage) LoadData(_ context.Context, data map[string]Metric) error {

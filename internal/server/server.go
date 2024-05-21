@@ -89,7 +89,7 @@ func (s *Server) LoadDataFromFile() error {
 	}
 	defer dataLoader.Close()
 
-	s.log.Sugar().Infof("Loading metrics data from file '%s'", dataLoader.GetFilename())
+	s.log.Sugar().Infof("Loading data from file '%s'", dataLoader.GetFilename())
 
 	if err := dataLoader.Load(); err != nil {
 		return fmt.Errorf("dataLoader.Load: %w", err)

@@ -292,7 +292,7 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	h.log.Sugar().Debugf("payload: %+v", metricPayload)
 
-	if err := metricPayload.Validate(); err != nil {
+	if err := metricPayload.ValidateUpdate(); err != nil {
 		h.handleError(w, err, http.StatusBadRequest)
 
 		return
@@ -300,12 +300,6 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	switch metricPayload.MType {
 	case string(monitor.MetricCounter):
-		if metricPayload.Delta == nil {
-			h.handleError(w, errormsg.ErrMetricEmptyDelta, http.StatusBadRequest)
-
-			return
-		}
-
 		if err := h.storage.SetCounter(ctx, metricPayload.ID, *metricPayload.Delta); err != nil {
 			h.handleError(w, err, http.StatusInternalServerError)
 
@@ -326,12 +320,6 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case string(monitor.MetricGauge):
-		if metricPayload.Value == nil {
-			h.handleError(w, errormsg.ErrMetricEmptyValue, http.StatusBadRequest)
-
-			return
-		}
-
 		if err := h.storage.SetGauge(ctx, metricPayload.ID, *metricPayload.Value); err != nil {
 			h.handleError(w, err, http.StatusInternalServerError)
 
@@ -355,4 +343,42 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(resp)
+}
+
+func (h *Handlers) UpdateMetricsJSON(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var metricsPayload []models.Metrics
+
+	if err := json.NewDecoder(r.Body).Decode(&metricsPayload); err != nil {
+		if errors.Is(err, io.EOF) {
+			h.handleError(w, errormsg.ErrEmptyRequestPayload, http.StatusBadRequest)
+
+			return
+		}
+
+		h.handleError(w, err, http.StatusBadRequest)
+
+		return
+	}
+
+	h.log.Sugar().Debugf("payload: %+v", metricsPayload)
+
+	for _, metric := range metricsPayload {
+		if err := metric.ValidateUpdate(); err != nil {
+			h.handleError(w, err, http.StatusBadRequest)
+
+			return
+		}
+	}
+
+	if err := h.storage.SetMetrics(ctx, metricsPayload); err != nil {
+		h.handleError(w, err, http.StatusInternalServerError)
+
+		return
+	}
+
+	w.Header().Set("content-type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
 }

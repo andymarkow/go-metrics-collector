@@ -3,6 +3,8 @@ package storage
 import (
 	"context"
 	"errors"
+
+	"github.com/andymarkow/go-metrics-collector/internal/models"
 )
 
 var (
@@ -17,6 +19,7 @@ type Storage interface {
 	SetCounter(ctx context.Context, name string, value int64) error
 	GetGauge(ctx context.Context, name string) (float64, error)
 	SetGauge(ctx context.Context, name string, value float64) error
+	SetMetrics(ctx context.Context, metrics []models.Metrics) error
 	LoadData(ctx context.Context, data map[string]Metric) error
 	Ping(ctx context.Context) error
 	Close() error

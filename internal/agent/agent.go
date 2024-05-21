@@ -58,7 +58,7 @@ func (a *Agent) Start() error {
 	for {
 		select {
 		case <-reportTicker.C:
-			a.monitor.PushJSON()
+			a.monitor.Push()
 		case <-pollTicker.C:
 			a.monitor.Collect()
 		}
