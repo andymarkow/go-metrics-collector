@@ -85,7 +85,7 @@ func (m *Middlewares) HashSumValidator(next http.Handler) http.Handler {
 			return
 		}
 
-		m.log.Debug("signature orig", zap.Any("sign", sign))
+		m.log.Info("signature orig", zap.Any("sign", sign))
 
 		signHeader, err := hex.DecodeString(r.Header.Get("HashSHA256"))
 		if err != nil {
@@ -95,7 +95,7 @@ func (m *Middlewares) HashSumValidator(next http.Handler) http.Handler {
 			return
 		}
 
-		m.log.Debug("signature head", zap.Any("sign", signHeader))
+		m.log.Info("signature head", zap.Any("sign", signHeader))
 
 		if !hmac.Equal(sign, signHeader) {
 			m.log.Error("signature mismatch", zap.Error(errormsg.ErrHashSumValueMismatch))

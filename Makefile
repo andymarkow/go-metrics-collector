@@ -10,7 +10,7 @@ LOG_LEVEL=debug
 RESTORE=false
 STORE_INTERVAL=10
 FILE_STORAGE_PATH=
-# KEY=secretkey
+KEY=secretkey
 # DATABASE_DSN=postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
 
 .PHONY: all

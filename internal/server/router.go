@@ -63,7 +63,7 @@ func newRouter(strg storage.Storage, opts ...Option) chiRouter {
 
 	r.Group(func(r chi.Router) {
 		if useHashSumValidator {
-			r.Use(mw.MetricValidator)
+			r.Use(mw.HashSumValidator)
 		}
 
 		r.Post("/updates", h.UpdateMetricsJSON)
