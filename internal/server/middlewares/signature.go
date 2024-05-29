@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"encoding/hex"
+	"errors"
 	"io"
 	"net/http"
 
@@ -67,7 +68,7 @@ import (
 func (m *Middlewares) HashSumValidator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
-		if err != nil {
+		if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
 			m.log.Error("read body", zap.Error(err))
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 
@@ -97,17 +98,12 @@ func (m *Middlewares) HashSumValidator(next http.Handler) http.Handler {
 		m.log.Debug("signature head", zap.Any("sign", signHeader))
 
 		if !hmac.Equal(sign, signHeader) {
+			m.log.Error("signature mismatch", zap.Error(errormsg.ErrHashSumValueMismatch))
 			http.Error(w, errormsg.ErrHashSumValueMismatch.Error(), http.StatusBadRequest)
 
 			return
 		}
 
-		// Create a buffer to capture the response body
-		// hashResponseWriter := newHashResponseWriter(w)
-
 		next.ServeHTTP(w, r)
-
-		// // Write the captured response body to the actual response
-		// w.Write(hashResponseWriter.body.Bytes())
 	})
 }

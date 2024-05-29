@@ -222,7 +222,7 @@ func (m *Monitor) sendRequest(metrics []models.Metrics) error {
 	body := buf.Bytes()
 
 	if len(m.signKey) > 0 {
-		sign, err := signature.CalculateHashSum(m.signKey, body)
+		sign, err := signature.CalculateHashSum(m.signKey, payload)
 		if err != nil {
 			return fmt.Errorf("signPayload: %w", err)
 		}
