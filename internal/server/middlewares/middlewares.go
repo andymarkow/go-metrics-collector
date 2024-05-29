@@ -12,7 +12,8 @@ import (
 
 // Middlewares is a collection of router middlewares.
 type Middlewares struct {
-	log *zap.Logger
+	log     *zap.Logger
+	signKey []byte
 }
 
 // New creates new Middlewares instance.
@@ -37,6 +38,13 @@ type Option func(m *Middlewares)
 func WithLogger(logger *zap.Logger) Option {
 	return func(m *Middlewares) {
 		m.log = logger
+	}
+}
+
+// WithSignKey is a router middleware option that sets sign key.
+func WithSignKey(signKey []byte) Option {
+	return func(m *Middlewares) {
+		m.signKey = signKey
 	}
 }
 

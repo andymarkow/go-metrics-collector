@@ -45,7 +45,7 @@ func NewServer() (*Server, error) {
 			return nil, fmt.Errorf("storage.NewPostgresStorage: %w", err)
 		}
 
-		ctx := context.TODO()
+		ctx := context.Background()
 
 		if err := pgStorage.Bootstrap(ctx); err != nil {
 			return nil, fmt.Errorf("pgStorage.Bootstrap: %w", err)
@@ -56,7 +56,7 @@ func NewServer() (*Server, error) {
 
 	store := storage.NewStorage(strg)
 
-	r := newRouter(store, WithLogger(log))
+	r := newRouter(store, WithLogger(log), WithSignKey([]byte(cfg.SignKey)))
 
 	srv := &http.Server{
 		Addr:              cfg.ServerAddr,

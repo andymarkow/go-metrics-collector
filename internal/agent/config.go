@@ -13,6 +13,7 @@ type config struct {
 	LogLevel       string `env:"LOG_LEVEL"`
 	PollInterval   int    `env:"POLL_INTERVAL"`
 	ReportInterval int    `env:"REPORT_INTERVAL"`
+	SignKey        string `env:"KEY"`
 }
 
 func newConfig() (config, error) {
@@ -20,6 +21,7 @@ func newConfig() (config, error) {
 
 	flag.StringVar(&cfg.ServerAddr, "a", "localhost:8080", "server endpoint address [env:ADDRESS]")
 	flag.StringVar(&cfg.LogLevel, "l", "info", "log output level [env:LOG_LEVEL]")
+	flag.StringVar(&cfg.SignKey, "k", "", "signing key [env:KEY]")
 	flag.IntVar(&cfg.PollInterval, "p", 2, "poll interval in seconds [env:POLL_INTERVAL]")
 	flag.IntVar(&cfg.ReportInterval, "r", 10, "report interval in seconds [env:REPORT_INTERVAL]")
 	flag.Parse()
