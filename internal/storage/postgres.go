@@ -349,6 +349,7 @@ func WithRetry(operation func() error) error {
 		if isRetryableError(err) {
 			retryWaitTime = time.Duration((i*retryWaitInterval + 1)) * time.Second // 1s, 3s, 5s, etc.
 
+			// TODO: time.After or time.Ticker.
 			time.Sleep(retryWaitTime)
 		} else {
 			return fmt.Errorf("%w", err)
@@ -357,6 +358,8 @@ func WithRetry(operation func() error) error {
 
 	return fmt.Errorf("retry attempts exceeded: %w", err)
 }
+
+// TODO: Lock/Unlock.
 
 // isRetryableError checks if error is retryable.
 func isRetryableError(err error) bool {

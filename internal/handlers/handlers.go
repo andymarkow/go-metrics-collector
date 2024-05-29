@@ -67,9 +67,7 @@ func (h *Handlers) handleError(
 }
 
 func (h *Handlers) Ping(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	if err := h.storage.Ping(ctx); err != nil {
+	if err := h.storage.Ping(r.Context()); err != nil {
 		h.handleError(w, err, http.StatusInternalServerError)
 
 		return

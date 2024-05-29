@@ -112,7 +112,7 @@ func (d *DataLoader) Load() error {
 		return fmt.Errorf("decoder.Decode: %w", err)
 	}
 
-	ctx := context.TODO()
+	ctx := context.Background()
 
 	if err := d.storage.LoadData(ctx, data); err != nil {
 		return fmt.Errorf("storage.LoadData: %w", err)

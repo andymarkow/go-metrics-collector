@@ -31,6 +31,7 @@ func NewAgent() (*Agent, error) {
 	mon := monitor.NewMonitor(
 		monitor.WithLogger(log),
 		monitor.WithServerAddr(cfg.ServerAddr),
+		monitor.WithSignKey([]byte(cfg.SignKey)),
 	)
 
 	return &Agent{
