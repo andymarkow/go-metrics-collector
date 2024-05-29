@@ -41,8 +41,10 @@ func newRouter(strg storage.Storage, opts ...Option) chiRouter {
 		mw.Compress,
 	)
 
+	var useHashSumValidator bool
+
 	if len(r.signKey) > 0 {
-		r.Use(mw.HashSumValidator)
+		useHashSumValidator = true
 	}
 
 	r.Get("/", h.GetAllMetrics)
@@ -57,6 +59,13 @@ func newRouter(strg storage.Storage, opts ...Option) chiRouter {
 	r.Group(func(r chi.Router) {
 		r.Post("/value", h.GetMetricJSON)
 		r.Post("/update", h.UpdateMetricJSON)
+	})
+
+	r.Group(func(r chi.Router) {
+		if useHashSumValidator {
+			r.Use(mw.MetricValidator)
+		}
+
 		r.Post("/updates", h.UpdateMetricsJSON)
 	})
 
