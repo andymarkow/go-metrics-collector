@@ -3,12 +3,14 @@ package monitor
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 
@@ -32,11 +34,15 @@ type Reseter interface {
 }
 
 type Monitor struct {
-	log     *zap.Logger
-	client  *httpclient.HTTPClient
-	memstat *runtime.MemStats
-	metrics []Metric
-	signKey []byte
+	log            *zap.Logger
+	client         *httpclient.HTTPClient
+	memstat        *runtime.MemStats
+	metrics        []Metric
+	gopsutilstats  []Metric
+	signKey        []byte
+	pollInterval   time.Duration
+	reportInterval time.Duration
+	rateLimit      int
 }
 
 func NewMonitor(opts ...Option) *Monitor {
@@ -76,13 +82,22 @@ func NewMonitor(opts ...Option) *Monitor {
 		newPollCountMetric(),
 	)
 
+	gopsutilstats := make([]Metric, 0)
+
+	gopsutilstats = append(gopsutilstats,
+		newTotalMemoryMetric(),
+		newFreeMemoryMetric(),
+		newCPUutilizationMetric(),
+	)
+
 	client := httpclient.NewHTTPClient()
 
 	mon := &Monitor{
-		log:     zap.Must(zap.NewDevelopment()),
-		client:  client,
-		memstat: &memstat,
-		metrics: metrics,
+		log:           zap.Must(zap.NewDevelopment()),
+		client:        client,
+		memstat:       &memstat,
+		metrics:       metrics,
+		gopsutilstats: gopsutilstats,
 	}
 
 	// Apply options
@@ -134,6 +149,68 @@ func WithSignKey(signKey []byte) Option {
 	}
 }
 
+func WithPollInterval(pollInterval time.Duration) Option {
+	return func(m *Monitor) {
+		m.pollInterval = pollInterval
+	}
+}
+
+func WithReportInterval(reportInterval time.Duration) Option {
+	return func(m *Monitor) {
+		m.reportInterval = reportInterval
+	}
+}
+
+func WithRateLimit(rateLimit int) Option {
+	return func(m *Monitor) {
+		m.rateLimit = rateLimit
+	}
+}
+
+func (m *Monitor) RunCollector(ctx context.Context) {
+	pollTicker := time.NewTicker(m.pollInterval)
+	defer pollTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-pollTicker.C:
+			m.Collect()
+		}
+	}
+}
+
+func (m *Monitor) RunCollectorGopsutils(ctx context.Context) {
+	pollTicker := time.NewTicker(m.pollInterval)
+	defer pollTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-pollTicker.C:
+			for _, v := range m.gopsutilstats {
+				v.Collect()
+			}
+		}
+	}
+}
+
+func (m *Monitor) RunReporter(ctx context.Context) {
+	reportTicker := time.NewTicker(m.reportInterval)
+	defer reportTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-reportTicker.C:
+			m.ReportMetrics(append(m.metrics, m.gopsutilstats...))
+		}
+	}
+}
+
 // Collect collects metrics.
 func (m *Monitor) Collect() {
 	runtime.ReadMemStats(m.memstat)
@@ -143,8 +220,95 @@ func (m *Monitor) Collect() {
 	}
 }
 
-// Push pushes metrics to the remote server.
-func (m *Monitor) Push() {
+func (m *Monitor) reportWorker(wg *sync.WaitGroup, metricsChan <-chan Metric) {
+	defer wg.Done()
+
+	const batchSize int = 100
+
+	var metrics []models.Metrics
+
+	for metric := range metricsChan {
+		m.log.Debug("reporting", zap.String("metric", metric.GetName()))
+
+		switch metric.GetKind() {
+		case string(MetricCounter):
+			val, ok := metric.GetValue().(int64)
+			if !ok {
+				m.log.Error("cant assert type int64: v.GetValue().(int64)")
+
+				continue
+			}
+
+			metrics = append(metrics, models.Metrics{
+				ID:    metric.GetName(),
+				MType: metric.GetKind(),
+				Delta: &val,
+			})
+
+		case string(MetricGauge):
+			val, ok := metric.GetValue().(float64)
+			if !ok {
+				m.log.Error("cant assert type float64: metric.GetValue().(float64)")
+
+				continue
+			}
+
+			metrics = append(metrics, models.Metrics{
+				ID:    metric.GetName(),
+				MType: metric.GetKind(),
+				Value: &val,
+			})
+		}
+
+		// Batch size limit
+		if len(metrics) >= batchSize {
+			if err := m.sendRequest(metrics); err != nil {
+				m.log.Error("sendRequest: " + err.Error())
+
+				continue
+			}
+
+			// Flush slice
+			metrics = metrics[:0]
+		}
+
+		// Reset counter metric
+		if c, ok := metric.(Reseter); ok {
+			c.Reset()
+		}
+	}
+
+	if len(metrics) > 0 {
+		if err := m.sendRequest(metrics); err != nil {
+			m.log.Error("sendRequest: " + err.Error())
+		}
+	}
+}
+
+func (m *Monitor) ReportMetrics(metrics []Metric) {
+	metricsChan := make(chan Metric, m.rateLimit)
+
+	wg := &sync.WaitGroup{}
+
+	// Spawn workers
+	for w := 1; w <= m.rateLimit; w++ {
+		wg.Add(1)
+		go m.reportWorker(wg, metricsChan)
+	}
+
+	// Send metrics to the metrics channel
+	for _, v := range metrics {
+		metricsChan <- v
+	}
+
+	// Close channel and send signal to stop workers
+	close(metricsChan)
+
+	wg.Wait()
+}
+
+// Report pushes metrics to the remote server.
+func (m *Monitor) Report() {
 	var metrics []models.Metrics
 
 	batchSize := 100

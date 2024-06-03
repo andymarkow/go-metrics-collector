@@ -1,7 +1,12 @@
 package agent
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/andymarkow/go-metrics-collector/internal/logger"
@@ -32,6 +37,9 @@ func NewAgent() (*Agent, error) {
 		monitor.WithLogger(log),
 		monitor.WithServerAddr(cfg.ServerAddr),
 		monitor.WithSignKey([]byte(cfg.SignKey)),
+		monitor.WithPollInterval(time.Duration(cfg.PollInterval)*time.Second),
+		monitor.WithReportInterval(time.Duration(cfg.ReportInterval)*time.Second),
+		monitor.WithRateLimit(cfg.RateLimit),
 	)
 
 	return &Agent{
@@ -48,20 +56,44 @@ func (a *Agent) Start() error {
 	a.log.Sugar().Infof("Polling interval: %s", a.pollInterval)
 	a.log.Sugar().Infof("Reporting interval: %s", a.reportInterval)
 
-	pollTicker := time.NewTicker(a.pollInterval)
-	reportTicker := time.NewTicker(a.reportInterval)
+	wg := &sync.WaitGroup{}
 
-	defer func() {
-		pollTicker.Stop()
-		reportTicker.Stop()
-	}()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	for {
-		select {
-		case <-reportTicker.C:
-			a.monitor.Push()
-		case <-pollTicker.C:
-			a.monitor.Collect()
-		}
-	}
+	wg.Add(1)
+	go func(wg *sync.WaitGroup) {
+		defer wg.Done()
+
+		a.monitor.RunCollector(ctx)
+	}(wg)
+
+	wg.Add(1)
+	go func(wg *sync.WaitGroup) {
+		defer wg.Done()
+
+		a.monitor.RunCollectorGopsutils(ctx)
+	}(wg)
+
+	wg.Add(1)
+	go func(wg *sync.WaitGroup) {
+		defer wg.Done()
+
+		a.monitor.RunReporter(ctx)
+	}(wg)
+
+	// Graceful shutdown by OS signals
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	<-quit
+	a.log.Sugar().Infof("Gracefully shutting down agent...")
+
+	// cancel the context to stop goroutines
+	cancel()
+
+	// waiting for goroutines to finish
+	wg.Wait()
+
+	return nil
 }
