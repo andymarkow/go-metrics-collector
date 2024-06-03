@@ -11,16 +11,11 @@ import (
 
 type chiRouter struct {
 	chi.Router
-	log *zap.Logger
+	log     *zap.Logger
+	signKey []byte
 }
 
 type Option func(r *chiRouter)
-
-func WithLogger(logger *zap.Logger) Option {
-	return func(r *chiRouter) {
-		r.log = logger
-	}
-}
 
 func newRouter(strg storage.Storage, opts ...Option) chiRouter {
 	r := chiRouter{
@@ -34,7 +29,10 @@ func newRouter(strg storage.Storage, opts ...Option) chiRouter {
 
 	h := handlers.NewHandlers(strg, handlers.WithLogger(r.log))
 
-	mw := middlewares.New(middlewares.WithLogger(r.log))
+	mw := middlewares.New(
+		middlewares.WithLogger(r.log),
+		middlewares.WithSignKey(r.signKey),
+	)
 
 	r.Use(
 		middleware.Recoverer,
@@ -42,6 +40,12 @@ func newRouter(strg storage.Storage, opts ...Option) chiRouter {
 		mw.Logger,
 		mw.Compress,
 	)
+
+	var useHashSumValidator bool
+
+	if len(r.signKey) > 0 {
+		useHashSumValidator = true
+	}
 
 	r.Get("/", h.GetAllMetrics)
 	r.Get("/ping", h.Ping)
@@ -55,8 +59,27 @@ func newRouter(strg storage.Storage, opts ...Option) chiRouter {
 	r.Group(func(r chi.Router) {
 		r.Post("/value", h.GetMetricJSON)
 		r.Post("/update", h.UpdateMetricJSON)
+	})
+
+	r.Group(func(r chi.Router) {
+		if useHashSumValidator {
+			r.Use(mw.HashSumValidator)
+		}
+
 		r.Post("/updates", h.UpdateMetricsJSON)
 	})
 
 	return r
+}
+
+func WithLogger(logger *zap.Logger) Option {
+	return func(r *chiRouter) {
+		r.log = logger
+	}
+}
+
+func WithSignKey(signKey []byte) Option {
+	return func(r *chiRouter) {
+		r.signKey = signKey
+	}
 }

@@ -6,6 +6,9 @@ import (
 	"runtime"
 	"strconv"
 	"sync"
+
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/mem"
 )
 
 type MetricType string
@@ -146,6 +149,18 @@ type (
 
 	PollCount struct {
 		CounterMetric
+	}
+
+	TotalMemory struct {
+		GaugeMetric
+	}
+
+	FreeMemory struct {
+		GaugeMetric
+	}
+
+	CPUutilization struct {
+		GaugeMetric
 	}
 )
 
@@ -490,4 +505,58 @@ func newPollCountMetric() *PollCount {
 	return &PollCount{
 		CounterMetric: newCounterMetric("PollCount"),
 	}
+}
+
+func newTotalMemoryMetric() *TotalMemory {
+	return &TotalMemory{
+		GaugeMetric: newGaugeMetric("TotalMemory"),
+	}
+}
+
+func (m *TotalMemory) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	v, err := mem.VirtualMemory()
+	if err != nil {
+		return
+	}
+
+	m.value = float64(v.Total)
+}
+
+func newFreeMemoryMetric() *FreeMemory {
+	return &FreeMemory{
+		GaugeMetric: newGaugeMetric("FreeMemory"),
+	}
+}
+
+func (m *FreeMemory) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	v, err := mem.VirtualMemory()
+	if err != nil {
+		return
+	}
+
+	m.value = float64(v.Free)
+}
+
+func newCPUutilizationMetric() *CPUutilization {
+	return &CPUutilization{
+		GaugeMetric: newGaugeMetric("CPUutilization"),
+	}
+}
+
+func (m *CPUutilization) Collect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	v, err := cpu.Percent(0, false)
+	if err != nil {
+		return
+	}
+
+	m.value = v[0]
 }
