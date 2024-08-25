@@ -4,9 +4,11 @@ import (
 	"github.com/andymarkow/go-metrics-collector/internal/handlers"
 	"github.com/andymarkow/go-metrics-collector/internal/server/middlewares"
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
-	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
+
+	_ "net/http/pprof" // Enable pprof debugger
 )
 
 type chiRouter struct {
@@ -46,6 +48,8 @@ func newRouter(strg storage.Storage, opts ...Option) chiRouter {
 	if len(r.signKey) > 0 {
 		useHashSumValidator = true
 	}
+
+	r.Mount("/debug", middleware.Profiler())
 
 	r.Get("/", h.GetAllMetrics)
 	r.Get("/ping", h.Ping)

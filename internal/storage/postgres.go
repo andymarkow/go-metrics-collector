@@ -359,8 +359,6 @@ func WithRetry(operation func() error) error {
 	return fmt.Errorf("retry attempts exceeded: %w", err)
 }
 
-// TODO: Lock/Unlock.
-
 // isRetryableError checks if error is retryable.
 func isRetryableError(err error) bool {
 	// Connection refused error

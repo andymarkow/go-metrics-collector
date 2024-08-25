@@ -49,3 +49,15 @@ coverage:
 	go tool cover -func=.coverage.cov
 	go tool cover -html=.coverage.cov
 	rm .coverage.cov
+
+# benchmark:
+# 	go test -v -bench .
+# 	go test -bench . -benchmem
+# 	go test -v -bench -benchmem -benchtime=10s .
+
+pprof:
+	### CPU profile
+	# go tool pprof -http=":9090" -seconds=30 http://localhost:8080/debug/pprof/profile
+	### Memory profile
+	# go tool pprof -http=":9090" -seconds=30 http://localhost:8080/debug/pprof/heap
+	# go tool pprof -http=":9090" -seconds=30 heap.out
