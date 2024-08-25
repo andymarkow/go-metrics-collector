@@ -3,6 +3,7 @@ package monitor
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/andymarkow/go-metrics-collector/internal/httpclient"
 	"github.com/andymarkow/go-metrics-collector/internal/models"
+	"github.com/andymarkow/go-metrics-collector/internal/signature"
 	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
 )
@@ -34,6 +36,7 @@ type Monitor struct {
 	client  *httpclient.HTTPClient
 	memstat *runtime.MemStats
 	metrics []Metric
+	signKey []byte
 }
 
 func NewMonitor(opts ...Option) *Monitor {
@@ -125,6 +128,12 @@ func WithServerAddr(addr string) Option {
 	}
 }
 
+func WithSignKey(signKey []byte) Option {
+	return func(m *Monitor) {
+		m.signKey = signKey
+	}
+}
+
 // Collect collects metrics.
 func (m *Monitor) Collect() {
 	runtime.ReadMemStats(m.memstat)
@@ -210,10 +219,23 @@ func (m *Monitor) sendRequest(metrics []models.Metrics) error {
 	}
 	zbuf.Flush()
 
+	body := buf.Bytes()
+
+	if len(m.signKey) > 0 {
+		sign, err := signature.CalculateHashSum(m.signKey, payload)
+		if err != nil {
+			return fmt.Errorf("signPayload: %w", err)
+		}
+
+		m.log.Debug("signanure", zap.String("sign", hex.EncodeToString(sign)))
+
+		m.client.SetHeader("HashSHA256", hex.EncodeToString(sign))
+	}
+
 	_, err = m.client.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Content-Encoding", "gzip").
-		SetBody(buf.Bytes()).
+		SetBody(body).
 		Post("/updates")
 	if err != nil {
 		return fmt.Errorf("client.Request: %w", err)
