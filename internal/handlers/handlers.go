@@ -73,7 +73,7 @@ func (h *Handlers) Ping(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("content-type", "text/html")
+	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
 }
@@ -96,7 +96,7 @@ func (h *Handlers) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 
 	slices.Sort(result)
 
-	w.Header().Set("content-type", "text/html")
+	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(strings.Join(result, "\n")))
 }
@@ -146,7 +146,7 @@ func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("content-type", "text/plain")
+	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
 	io.WriteString(w, metricValue)
 }
@@ -191,7 +191,7 @@ func (h *Handlers) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("content-type", "text/plain")
+	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(http.StatusText(http.StatusOK)))
 }
@@ -265,7 +265,7 @@ func (h *Handlers) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("content-type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(resp)
 }
@@ -338,7 +338,7 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("content-type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(resp)
 }
@@ -376,7 +376,7 @@ func (h *Handlers) UpdateMetricsJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("content-type", "text/html")
+	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
 }

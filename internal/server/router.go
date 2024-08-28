@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
 
-	_ "net/http/pprof" // Enable pprof debugger
+	_ "net/http/pprof" //nolint:gosec // Enable pprof debugger
 )
 
 type chiRouter struct {

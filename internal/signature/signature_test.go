@@ -1,6 +1,7 @@
 package signature
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -14,7 +15,7 @@ func generateRandomBytes(length int) ([]byte, error) {
 
 	_, err := rand.Read(bytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("rand.Read: %w", err)
 	}
 
 	return bytes, nil
@@ -26,10 +27,10 @@ func BenchmarkCalculateHashSum(b *testing.B) {
 	bytesData := make([][]byte, 10000)
 
 	// Set max random value
-	max := big.NewInt(100)
+	mx := big.NewInt(100)
 
 	// Generate a random number using crypto/rand with max as the upper bound
-	randInt, err := rand.Int(rand.Reader, max)
+	randInt, err := rand.Int(rand.Reader, mx)
 	assert.NoError(b, err)
 
 	for i := 0; i < len(bytesData); i++ {
@@ -45,7 +46,8 @@ func BenchmarkCalculateHashSum(b *testing.B) {
 	counter := 0
 
 	for i := 0; i < b.N; i++ {
-		CalculateHashSum([]byte("key"), bytesData[counter])
+		_, err := CalculateHashSum([]byte("key"), bytesData[counter])
+		assert.NoError(b, err)
 
 		counter++
 

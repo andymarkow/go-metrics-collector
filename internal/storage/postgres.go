@@ -340,7 +340,7 @@ func WithRetry(operation func() error) error {
 
 	var err error
 
-	for i := 0; i < retryCount; i++ {
+	for i := range retryCount {
 		err = operation()
 		if err == nil {
 			return nil

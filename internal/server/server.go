@@ -61,9 +61,9 @@ func NewServer() (*Server, error) {
 	srv := &http.Server{
 		Addr:              cfg.ServerAddr,
 		Handler:           r,
-		ReadTimeout:       30 * time.Second,
+		ReadTimeout:       60 * time.Second,
 		ReadHeaderTimeout: 10 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		WriteTimeout:      60 * time.Second,
 	}
 
 	return &Server{

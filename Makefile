@@ -35,6 +35,9 @@ run-postgres:
 stop-postgres:
 	docker-compose down postgres pgadmin
 
+vet:
+	go vet ./...
+
 lint:
 	docker run --rm --name golangci-lint -v `pwd`:/workspace -w /workspace \
 		golangci/golangci-lint:latest-alpine golangci-lint run --issues-exit-code 1
@@ -59,5 +62,6 @@ pprof:
 	### CPU profile
 	# go tool pprof -http=":9090" -seconds=30 http://localhost:8080/debug/pprof/profile
 	### Memory profile
+	# curl -sK -v http://localhost:8080/debug/pprof/heap > heap.out
 	# go tool pprof -http=":9090" -seconds=30 http://localhost:8080/debug/pprof/heap
 	# go tool pprof -http=":9090" -seconds=30 heap.out
