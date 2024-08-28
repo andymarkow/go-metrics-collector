@@ -45,3 +45,10 @@ go tool pprof -http=":9090" -seconds=30 http://localhost:8090/debug/pprof/heap
 curl -Ssv http://localhost:8090/debug/pprof/heap > heap.out
 go tool pprof -http=":9090" -seconds=30 heap.out
 ```
+
+### Compare profiles
+
+To compare profiles (CPU or memory) use command:
+```bash
+pprof -top -diff_base=profiles/base.pprof profiles/result.pprof
+```
