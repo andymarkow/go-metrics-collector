@@ -56,3 +56,10 @@ func BenchmarkCalculateHashSum(b *testing.B) {
 		}
 	}
 }
+
+func ExampleCalculateHashSum() {
+	_, err := CalculateHashSum([]byte("key"), []byte("value"))
+	if err != nil {
+		panic(err)
+	}
+}
