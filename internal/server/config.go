@@ -7,6 +7,7 @@ import (
 	"github.com/caarlos0/env"
 )
 
+// config represents the server configuration.
 type config struct {
 	ServerAddr    string `env:"ADDRESS"`
 	LogLevel      string `env:"LOG_LEVEL"`
@@ -17,6 +18,14 @@ type config struct {
 	SignKey       string `env:"KEY"`
 }
 
+// newConfig creates a new config for the server.
+//
+// It uses both environment variables and command line flags to populate the
+// config struct. If any of the environment variables or command line flags are
+// not set, it will use default values.
+//
+// If there is an error while parsing the environment variables, it will return
+// an error.
 func newConfig() (config, error) {
 	cfg := config{}
 

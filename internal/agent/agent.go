@@ -1,3 +1,4 @@
+// Package agent provides a metrics collector and reporter agent.
 package agent
 
 import (
@@ -14,14 +15,21 @@ import (
 	"go.uber.org/zap"
 )
 
+// Agent represents a metrics agent that collects and reports metrics.
 type Agent struct {
-	serverAddr     string
-	pollInterval   time.Duration
+	// ServerAddr is the address of the server.
+	serverAddr string
+	// PollInterval is the interval at which metrics are collected.
+	pollInterval time.Duration
+	// ReportInterval is the interval at which metrics are reported.
 	reportInterval time.Duration
-	log            *zap.Logger
-	monitor        *monitor.Monitor
+	// Log is the logger instance used for logging.
+	log *zap.Logger
+	// Monitor is the monitor instance used for monitoring.
+	monitor *monitor.Monitor
 }
 
+// NewAgent creates a new agent instance.
 func NewAgent() (*Agent, error) {
 	cfg, err := newConfig()
 	if err != nil {
@@ -51,6 +59,7 @@ func NewAgent() (*Agent, error) {
 	}, nil
 }
 
+// Start starts the agent intance.
 func (a *Agent) Start() error {
 	a.log.Sugar().Infof("Starting agent with server endpoint '%s'", a.serverAddr)
 	a.log.Sugar().Infof("Polling interval: %s", a.pollInterval)

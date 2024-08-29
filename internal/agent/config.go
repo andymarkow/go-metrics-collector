@@ -8,6 +8,7 @@ import (
 	"github.com/caarlos0/env"
 )
 
+// config represents the agent configuration.
 type config struct {
 	ServerAddr     string `env:"ADDRESS"`
 	LogLevel       string `env:"LOG_LEVEL"`
@@ -17,6 +18,7 @@ type config struct {
 	RateLimit      int    `env:"RATE_LIMIT"`
 }
 
+// newConfig creates a new config for agent.
 func newConfig() (config, error) {
 	cfg := config{}
 

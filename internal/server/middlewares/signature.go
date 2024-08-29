@@ -65,6 +65,12 @@ import (
 // 	return h.w.Header()
 // }
 
+// HashSumValidator is a router middleware that validates the hash sum of the request body.
+//
+// The middleware expects the hash sum to be passed in the "HashSHA256" header.
+// The hash sum is calculated using the SHA-256 algorithm and the given sign key.
+//
+// If the hash sum is invalid or the header is missing, the middleware returns a 400 status code.
 func (m *Middlewares) HashSumValidator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)

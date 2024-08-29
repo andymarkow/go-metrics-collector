@@ -17,6 +17,7 @@ import (
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
 )
 
+// Server represents a metrics server.
 type Server struct {
 	srv           *http.Server
 	log           *zap.Logger
@@ -26,6 +27,7 @@ type Server struct {
 	restoreOnBoot bool
 }
 
+// NewServer creates a new metrics server.
 func NewServer() (*Server, error) {
 	cfg, err := newConfig()
 	if err != nil {
@@ -76,12 +78,14 @@ func NewServer() (*Server, error) {
 	}, nil
 }
 
+// Close closes the server.
 func (s *Server) Close() {
 	if err := s.storage.Close(); err != nil {
 		s.log.Error("storage.Close", zap.Error(err))
 	}
 }
 
+// LoadDataFromFile loads the metrics data from the file.
 func (s *Server) LoadDataFromFile() error {
 	dataLoader, err := datamanager.NewDataLoader(s.storeFile, s.storage)
 	if err != nil {
@@ -98,6 +102,7 @@ func (s *Server) LoadDataFromFile() error {
 	return nil
 }
 
+// SaveDataToFile saves the metrics data to the file.
 func (s *Server) SaveDataToFile(ctx context.Context, wg *sync.WaitGroup) error {
 	defer wg.Done()
 
@@ -127,6 +132,7 @@ func (s *Server) SaveDataToFile(ctx context.Context, wg *sync.WaitGroup) error {
 	}
 }
 
+// Start starts the server.
 func (s *Server) Start() error {
 	defer s.Close()
 
@@ -163,7 +169,7 @@ func (s *Server) Start() error {
 		}
 	}()
 
-	// Graceful shutdown handler
+	// Graceful shutdown handler.
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
