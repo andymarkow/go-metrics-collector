@@ -14,11 +14,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-resty/resty/v2"
+	"go.uber.org/zap"
+
 	"github.com/andymarkow/go-metrics-collector/internal/httpclient"
 	"github.com/andymarkow/go-metrics-collector/internal/models"
 	"github.com/andymarkow/go-metrics-collector/internal/signature"
-	"github.com/go-resty/resty/v2"
-	"go.uber.org/zap"
 )
 
 // Metric is an interface for metrics.
@@ -147,12 +148,12 @@ func NewMonitor(opts ...Option) *Monitor {
 		gopsutilstats: gopsutilstats,
 	}
 
-	// Apply options
+	// Apply options.
 	for _, opt := range opts {
 		opt(mon)
 	}
 
-	// Configure the retry strategy
+	// Configure the retry strategy.
 	client.
 		SetLogger(mon.log.Sugar()).
 		SetRetryCount(3).                  // Number of retry attempts
@@ -160,7 +161,7 @@ func NewMonitor(opts ...Option) *Monitor {
 		SetRetryMaxWaitTime(10 * time.Second).
 		SetRetryAfter(retryAfterWithInterval(2)).
 		AddRetryCondition(func(_ *resty.Response, err error) bool {
-			// Retry for retryable errors
+			// Retry for retryable errors.
 			return isRetryableError(err)
 		})
 

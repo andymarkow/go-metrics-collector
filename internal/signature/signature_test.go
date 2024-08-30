@@ -57,7 +57,7 @@ func BenchmarkCalculateHashSum(b *testing.B) {
 	}
 }
 
-func ExampleCalculateHashSum() {
+func ExampleCalculateHashSum() { //nolint:testableexamples
 	_, err := CalculateHashSum([]byte("key"), []byte("value"))
 	if err != nil {
 		panic(err)

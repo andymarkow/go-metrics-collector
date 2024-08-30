@@ -9,14 +9,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andymarkow/go-metrics-collector/internal/models"
-	"github.com/pressly/goose/v3"
-
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
+	_ "github.com/jackc/pgx/v5/stdlib" // Postgresql driver.
+	"github.com/pressly/goose/v3"
 
-	// Postgresql driver.
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/andymarkow/go-metrics-collector/internal/models"
 )
 
 // PostgresStorage implements the Storage interface using Postgres.

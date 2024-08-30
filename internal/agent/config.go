@@ -34,7 +34,7 @@ func newConfig() (config, error) {
 		return cfg, fmt.Errorf("env.Parse: %w", err)
 	}
 
-	// Check if the URL does not start with "http://" or "https://"
+	// Check if the URL does not start with "http://" or "https://".
 	if !strings.HasPrefix(cfg.ServerAddr, "http://") &&
 		!strings.HasPrefix(cfg.ServerAddr, "https://") {
 		cfg.ServerAddr = "http://" + cfg.ServerAddr

@@ -8,62 +8,11 @@ import (
 	"io"
 	"net/http"
 
+	"go.uber.org/zap"
+
 	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
 	"github.com/andymarkow/go-metrics-collector/internal/signature"
-	"go.uber.org/zap"
 )
-
-// type hashResponseWriter struct {
-// 	w    http.ResponseWriter
-// 	body *bytes.Buffer
-// }
-
-// func newHashResponseWriter(w http.ResponseWriter) *hashResponseWriter {
-// 	return &hashResponseWriter{
-// 		w:    w,
-// 		body: new(bytes.Buffer),
-// 	}
-// }
-
-// func (h *hashResponseWriter) Write(b []byte) (int, error) {
-
-// 	bw, err := h.body.Write(b)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-
-// 	fmt.Printf("body: %v\n", h.body.String())
-
-// 	// Compute the hash sum of the captured response body
-// 	hash := sha256.New()
-// 	if _, err := io.Copy(hash, bytes.NewReader(b)); err != nil {
-// 		// m.log.Error("compute hash", zap.Error(err))
-// 		// http.Error(w, err.Error(), http.StatusInternalServerError)
-
-// 		log.Printf("compute hash: %v\n", err)
-
-// 		// return
-// 	}
-
-// 	hashSum := hash.Sum(nil)
-// 	hashHex := hex.EncodeToString(hashSum)
-
-// 	// Set the hash in the response headers
-// 	h.w.Header().Set("HashSHA256", hashHex)
-
-// 	fmt.Printf("Hash: %s\n", hashHex)
-// 	fmt.Printf("body: %v\n", h.body.String())
-
-// 	return bw, nil
-// }
-
-// func (h *hashResponseWriter) WriteHeader(statusCode int) {
-// 	h.w.WriteHeader(statusCode)
-// }
-
-// func (h *hashResponseWriter) Header() http.Header {
-// 	return h.w.Header()
-// }
 
 // HashSumValidator is a router middleware that validates the hash sum of the request body.
 //
@@ -93,7 +42,7 @@ func (m *Middlewares) HashSumValidator(next http.Handler) http.Handler {
 
 		m.log.Info("signature orig", zap.Any("sign", sign))
 
-		signHeader, err := hex.DecodeString(r.Header.Get("HashSHA256")) //nolint:canonicalheader
+		signHeader, err := hex.DecodeString(r.Header.Get("HashSHA256"))
 		if err != nil {
 			m.log.Error("decode signature", zap.Error(err))
 			http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -11,12 +11,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
+
 	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
 	"github.com/andymarkow/go-metrics-collector/internal/models"
 	"github.com/andymarkow/go-metrics-collector/internal/monitor"
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
-	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 )
 
 // Handlers is a collection of router handlers.

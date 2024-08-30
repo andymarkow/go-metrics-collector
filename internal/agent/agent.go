@@ -10,23 +10,19 @@ import (
 	"syscall"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/andymarkow/go-metrics-collector/internal/logger"
 	"github.com/andymarkow/go-metrics-collector/internal/monitor"
-	"go.uber.org/zap"
 )
 
 // Agent represents a metrics agent that collects and reports metrics.
 type Agent struct {
-	// ServerAddr is the address of the server.
-	serverAddr string
-	// PollInterval is the interval at which metrics are collected.
-	pollInterval time.Duration
-	// ReportInterval is the interval at which metrics are reported.
-	reportInterval time.Duration
-	// Log is the logger instance used for logging.
-	log *zap.Logger
-	// Monitor is the monitor instance used for monitoring.
-	monitor *monitor.Monitor
+	serverAddr     string           // ServerAddr is the address of the server.
+	pollInterval   time.Duration    // PollInterval is the interval at which metrics are collected.
+	reportInterval time.Duration    // ReportInterval is the interval at which metrics are reported.
+	log            *zap.Logger      // Log is the logger instance used for logging.
+	monitor        *monitor.Monitor // Monitor is the monitor instance used for monitoring.
 }
 
 // NewAgent creates a new agent instance.
@@ -91,17 +87,17 @@ func (a *Agent) Start() error {
 		a.monitor.RunReporter(ctx)
 	}(wg)
 
-	// Graceful shutdown by OS signals
+	// Graceful shutdown by OS signals.
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	<-quit
 	a.log.Sugar().Infof("Gracefully shutting down agent...")
 
-	// cancel the context to stop goroutines
+	// Cancel the context to stop goroutines.
 	cancel()
 
-	// waiting for goroutines to finish
+	// Waiting for goroutines to finish.
 	wg.Wait()
 
 	return nil
