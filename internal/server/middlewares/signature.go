@@ -42,7 +42,7 @@ func (m *Middlewares) HashSumValidator(next http.Handler) http.Handler {
 
 		m.log.Info("signature orig", zap.Any("sign", sign))
 
-		signHeader, err := hex.DecodeString(r.Header.Get("HashSHA256"))
+		signHeader, err := hex.DecodeString(r.Header.Get("HashSHA256")) //nolint:canonicalheader,nolintlint
 		if err != nil {
 			m.log.Error("decode signature", zap.Error(err))
 			http.Error(w, err.Error(), http.StatusInternalServerError)

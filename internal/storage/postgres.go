@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib" // Postgresql driver.
 	"github.com/pressly/goose/v3"
+	"go.uber.org/zap"
 
 	"github.com/andymarkow/go-metrics-collector/internal/models"
 )
@@ -22,14 +23,15 @@ var _ Storage = (*PostgresStorage)(nil)
 
 // PostgresStorage is a Storage implementation using Postgres.
 type PostgresStorage struct {
-	db *sql.DB
+	log *zap.Logger
+	db  *sql.DB
 }
 
 // NewPostgresStorage creates a new PostgresStorage instance with the given connection string.
 //
 // The database connection is established when NewPostgresStorage is called, and it is closed when
 // Close is called on the returned PostgresStorage instance.
-func NewPostgresStorage(connStr string) (*PostgresStorage, error) {
+func NewPostgresStorage(connStr string, opts ...Option) (*PostgresStorage, error) {
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
 		return nil, fmt.Errorf("sql.Open: %w", err)
@@ -40,9 +42,24 @@ func NewPostgresStorage(connStr string) (*PostgresStorage, error) {
 	db.SetConnMaxIdleTime(180 * time.Second)
 	db.SetConnMaxLifetime(3600 * time.Second)
 
-	return &PostgresStorage{
-		db: db,
-	}, nil
+	pgstorage := &PostgresStorage{
+		log: zap.NewNop(),
+		db:  db,
+	}
+
+	for _, opt := range opts {
+		opt(pgstorage)
+	}
+
+	return pgstorage, nil
+}
+
+type Option func(*PostgresStorage)
+
+func WithLogger(logger *zap.Logger) Option {
+	return func(pg *PostgresStorage) {
+		pg.log = logger
+	}
 }
 
 // Bootstrap migrates the database schema to the latest version.
@@ -100,13 +117,21 @@ func (pg *PostgresStorage) GetAllMetrics(ctx context.Context) (map[string]Metric
 		if err != nil {
 			return fmt.Errorf("db.PrepareContext: %w", err)
 		}
-		defer countersStmt.Close()
+		defer func() {
+			if err := countersStmt.Close(); err != nil {
+				pg.log.Error("countersStmt.Close: " + err.Error())
+			}
+		}()
 
 		counters, err := countersStmt.QueryContext(ctx)
 		if err != nil {
 			return fmt.Errorf("countersStmt.QueryContext: %w", err)
 		}
-		defer counters.Close()
+		defer func() {
+			if err := counters.Close(); err != nil {
+				pg.log.Error("counters.Close: " + err.Error())
+			}
+		}()
 
 		for counters.Next() {
 			var name string
@@ -130,13 +155,21 @@ func (pg *PostgresStorage) GetAllMetrics(ctx context.Context) (map[string]Metric
 		if err != nil {
 			return fmt.Errorf("db.PrepareContext: %w", err)
 		}
-		defer gaugesStmt.Close()
+		defer func() {
+			if err := gaugesStmt.Close(); err != nil {
+				pg.log.Error("gaugesStmt.Close: " + err.Error())
+			}
+		}()
 
 		gauges, err := gaugesStmt.QueryContext(ctx)
 		if err != nil {
 			return fmt.Errorf("gaugesStmt.QueryContext: %w", err)
 		}
-		defer gauges.Close()
+		defer func() {
+			if err := gauges.Close(); err != nil {
+				pg.log.Error("gauges.Close: " + err.Error())
+			}
+		}()
 
 		for gauges.Next() {
 			var name string
@@ -173,7 +206,11 @@ func (pg *PostgresStorage) GetCounter(ctx context.Context, name string) (int64, 
 		if err != nil {
 			return fmt.Errorf("db.PrepareContext: %w", err)
 		}
-		defer stmt.Close()
+		defer func() {
+			if err := stmt.Close(); err != nil {
+				pg.log.Error("stmt.Close: " + err.Error())
+			}
+		}()
 
 		row := stmt.QueryRowContext(ctx, name)
 
@@ -205,7 +242,11 @@ func (pg *PostgresStorage) SetCounter(ctx context.Context, name string, value in
 		if err != nil {
 			return fmt.Errorf("db.PrepareContext: %w", err)
 		}
-		defer stmt.Close()
+		defer func() {
+			if err := stmt.Close(); err != nil {
+				pg.log.Error("stmt.Close: " + err.Error())
+			}
+		}()
 
 		_, err = stmt.ExecContext(ctx, name, value)
 		if err != nil {
@@ -229,7 +270,11 @@ func (pg *PostgresStorage) GetGauge(ctx context.Context, name string) (float64, 
 		if err != nil {
 			return fmt.Errorf("db.PrepareContext: %w", err)
 		}
-		defer stmt.Close()
+		defer func() {
+			if err := stmt.Close(); err != nil {
+				pg.log.Error("stmt.Close: " + err.Error())
+			}
+		}()
 
 		row := stmt.QueryRowContext(ctx, name)
 
@@ -260,7 +305,11 @@ func (pg *PostgresStorage) SetGauge(ctx context.Context, name string, value floa
 		if err != nil {
 			return fmt.Errorf("db.PrepareContext: %w", err)
 		}
-		defer stmt.Close()
+		defer func() {
+			if err := stmt.Close(); err != nil {
+				pg.log.Error("stmt.Close: " + err.Error())
+			}
+		}()
 
 		_, err = stmt.ExecContext(ctx, name, value)
 		if err != nil {
@@ -282,7 +331,11 @@ func (pg *PostgresStorage) SetMetrics(ctx context.Context, metrics []models.Metr
 		if err != nil {
 			return fmt.Errorf("db.Begin: %w", err)
 		}
-		defer tx.Rollback() //nolint:errcheck
+		defer func() {
+			if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+				pg.log.Error("tx.Rollback: " + err.Error())
+			}
+		}()
 
 		counterStmt, err := tx.PrepareContext(ctx,
 			"INSERT INTO metric_counters (name, value) VALUES ($1, $2)"+
@@ -290,7 +343,11 @@ func (pg *PostgresStorage) SetMetrics(ctx context.Context, metrics []models.Metr
 		if err != nil {
 			return fmt.Errorf("tx.PrepareContext: %w", err)
 		}
-		defer counterStmt.Close()
+		defer func() {
+			if err := counterStmt.Close(); err != nil {
+				pg.log.Error("counterStmt.Close: " + err.Error())
+			}
+		}()
 
 		gaugeStmt, err := tx.PrepareContext(ctx,
 			"INSERT INTO metric_gauges (name, value) VALUES ($1, $2)"+
@@ -298,7 +355,11 @@ func (pg *PostgresStorage) SetMetrics(ctx context.Context, metrics []models.Metr
 		if err != nil {
 			return fmt.Errorf("tx.PrepareContext: %w", err)
 		}
-		defer gaugeStmt.Close()
+		defer func() {
+			if err := gaugeStmt.Close(); err != nil {
+				pg.log.Error("gaugeStmt.Close: " + err.Error())
+			}
+		}()
 
 		for _, metric := range metrics {
 			switch metric.MType {
@@ -359,7 +420,7 @@ func WithRetry(operation func() error) error {
 		if isRetryableError(err) {
 			retryWaitTime = time.Duration((i*retryWaitInterval + 1)) * time.Second // 1s, 3s, 5s, etc.
 
-			// TODO: time.After or time.Ticker.
+			// TBD: time.After or time.Ticker.
 			time.Sleep(retryWaitTime)
 		} else {
 			return fmt.Errorf("%w", err)

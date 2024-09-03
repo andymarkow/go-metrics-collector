@@ -1,3 +1,4 @@
+// Package errormsg provides error messages.
 package errormsg
 
 import "errors"

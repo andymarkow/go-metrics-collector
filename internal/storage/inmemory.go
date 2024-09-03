@@ -13,8 +13,8 @@ import (
 var _ Storage = (*MemStorage)(nil)
 
 type Metric struct {
-	Type  monitor.MetricType `json:"type"`
 	Value any                `json:"value"`
+	Type  monitor.MetricType `json:"type"`
 }
 
 func (m *Metric) StringValue() string {

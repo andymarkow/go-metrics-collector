@@ -1,3 +1,4 @@
+// Package middlewares provides router middlewares.
 package middlewares
 
 import (

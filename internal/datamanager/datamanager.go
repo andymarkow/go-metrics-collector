@@ -1,3 +1,4 @@
+// Package datamanager provides a metrics file writer.
 package datamanager
 
 import (

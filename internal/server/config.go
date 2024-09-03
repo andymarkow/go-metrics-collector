@@ -11,11 +11,11 @@ import (
 type config struct {
 	ServerAddr    string `env:"ADDRESS"`
 	LogLevel      string `env:"LOG_LEVEL"`
+	DatabaseDSN   string `env:"DATABASE_DSN"`
+	SignKey       string `env:"KEY"`
 	StoreFile     string `env:"FILE_STORAGE_PATH"`
 	StoreInterval int    `env:"STORE_INTERVAL"`
 	RestoreOnBoot bool   `env:"RESTORE"`
-	DatabaseDSN   string `env:"DATABASE_DSN"`
-	SignKey       string `env:"KEY"`
 }
 
 // newConfig creates a new config for the server.

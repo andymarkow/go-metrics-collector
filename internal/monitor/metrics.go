@@ -103,8 +103,8 @@ func (m *GaugeMetric) GetValueString() string {
 }
 
 type MemStatsMetric struct {
-	GaugeMetric
 	source *runtime.MemStats
+	GaugeMetric
 }
 
 func newMemStatsMetric(name string, source *runtime.MemStats) MemStatsMetric {

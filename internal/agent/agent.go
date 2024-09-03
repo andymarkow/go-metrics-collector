@@ -18,11 +18,11 @@ import (
 
 // Agent represents a metrics agent that collects and reports metrics.
 type Agent struct {
+	log            *zap.Logger      // Log is the logger instance used for logging.
+	monitor        *monitor.Monitor // Monitor is the monitor instance used for monitoring.
 	serverAddr     string           // ServerAddr is the address of the server.
 	pollInterval   time.Duration    // PollInterval is the interval at which metrics are collected.
 	reportInterval time.Duration    // ReportInterval is the interval at which metrics are reported.
-	log            *zap.Logger      // Log is the logger instance used for logging.
-	monitor        *monitor.Monitor // Monitor is the monitor instance used for monitoring.
 }
 
 // NewAgent creates a new agent instance.

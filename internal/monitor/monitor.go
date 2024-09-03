@@ -1,3 +1,4 @@
+// Package monitor provides a metrics monitor.
 package monitor
 
 import (
@@ -439,12 +440,18 @@ func (m *Monitor) sendRequest(metrics []models.Metrics) error {
 
 	buf := bytes.NewBuffer(nil)
 	zbuf := gzip.NewWriter(buf)
-	defer zbuf.Close()
+	defer func() {
+		if err := zbuf.Close(); err != nil {
+			m.log.Error("zbuf.Close: " + err.Error())
+		}
+	}()
 
 	if _, err := zbuf.Write(payload); err != nil {
 		return fmt.Errorf("zbuf.Write: %w", err)
 	}
-	zbuf.Flush()
+	if err := zbuf.Close(); err != nil {
+		return fmt.Errorf("zbuf.Close: %w", err)
+	}
 
 	body := buf.Bytes()
 

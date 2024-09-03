@@ -1,4 +1,4 @@
-//nolint:errcheck
+// Package handlers provides HTTP handlers.
 package handlers
 
 import (
@@ -22,8 +22,8 @@ import (
 
 // Handlers is a collection of router handlers.
 type Handlers struct {
-	storage storage.Storage
 	log     *zap.Logger
+	storage storage.Storage
 }
 
 // NewHandlers returns a new Handlers instance.
@@ -51,24 +51,6 @@ func WithLogger(logger *zap.Logger) Option {
 	}
 }
 
-// parseGaugeMetricValue parses gauge metric value from string.
-func parseGaugeMetricValue(s string) (float64, error) {
-	v, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return 0, fmt.Errorf("strconv.ParseFloat: %w", err)
-	}
-
-	return v, nil
-}
-
-// handleError handles error response.
-func (h *Handlers) handleError(
-	w http.ResponseWriter, err error, statusCode int,
-) {
-	h.log.Error(err.Error())
-	http.Error(w, err.Error(), statusCode)
-}
-
 // Ping handles ping request.
 func (h *Handlers) Ping(w http.ResponseWriter, r *http.Request) {
 	if err := h.storage.Ping(r.Context()); err != nil {
@@ -79,7 +61,7 @@ func (h *Handlers) Ping(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	h.checkRespError(w.Write([]byte("OK")))
 }
 
 // GetAllMetrics handles get all metrics request.
@@ -103,7 +85,7 @@ func (h *Handlers) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(strings.Join(result, "\n")))
+	h.checkRespError(w.Write([]byte(strings.Join(result, "\n"))))
 }
 
 func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +135,7 @@ func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, metricValue)
+	h.checkRespError(io.WriteString(w, metricValue))
 }
 
 func (h *Handlers) UpdateMetric(w http.ResponseWriter, r *http.Request) {
@@ -198,7 +180,7 @@ func (h *Handlers) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(http.StatusText(http.StatusOK)))
+	h.checkRespError(w.Write([]byte(http.StatusText(http.StatusOK))))
 }
 
 func (h *Handlers) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
@@ -272,7 +254,7 @@ func (h *Handlers) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(resp)
+	h.checkRespError(w.Write(resp))
 }
 
 func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
@@ -345,7 +327,7 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(resp)
+	h.checkRespError(w.Write(resp))
 }
 
 func (h *Handlers) UpdateMetricsJSON(w http.ResponseWriter, r *http.Request) {
@@ -383,5 +365,29 @@ func (h *Handlers) UpdateMetricsJSON(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	h.checkRespError(w.Write([]byte("OK")))
+}
+
+// parseGaugeMetricValue parses gauge metric value from string.
+func parseGaugeMetricValue(s string) (float64, error) {
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, fmt.Errorf("strconv.ParseFloat: %w", err)
+	}
+
+	return v, nil
+}
+
+func (h *Handlers) checkRespError(_ int, err error) {
+	if err != nil {
+		h.log.Error("failed to write response", zap.Error(err))
+	}
+}
+
+// handleError handles error response.
+func (h *Handlers) handleError(
+	w http.ResponseWriter, err error, statusCode int,
+) {
+	h.log.Error(err.Error())
+	http.Error(w, err.Error(), statusCode)
 }
