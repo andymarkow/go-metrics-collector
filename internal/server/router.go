@@ -1,14 +1,15 @@
 package server
 
 import (
-	"github.com/andymarkow/go-metrics-collector/internal/handlers"
-	"github.com/andymarkow/go-metrics-collector/internal/server/middlewares"
-	"github.com/andymarkow/go-metrics-collector/internal/storage"
+	_ "net/http/pprof" //nolint:gosec // Enable pprof debugger
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
 
-	_ "net/http/pprof" //nolint:gosec // Enable pprof debugger
+	"github.com/andymarkow/go-metrics-collector/internal/handlers"
+	"github.com/andymarkow/go-metrics-collector/internal/server/middlewares"
+	"github.com/andymarkow/go-metrics-collector/internal/storage"
 )
 
 type chiRouter struct {

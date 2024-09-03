@@ -9,22 +9,26 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andymarkow/go-metrics-collector/internal/models"
-	"github.com/pressly/goose/v3"
-
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
+	_ "github.com/jackc/pgx/v5/stdlib" // Postgresql driver.
+	"github.com/pressly/goose/v3"
 
-	// Postgresql driver.
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/andymarkow/go-metrics-collector/internal/models"
 )
 
+// PostgresStorage implements the Storage interface using Postgres.
 var _ Storage = (*PostgresStorage)(nil)
 
+// PostgresStorage is a Storage implementation using Postgres.
 type PostgresStorage struct {
 	db *sql.DB
 }
 
+// NewPostgresStorage creates a new PostgresStorage instance with the given connection string.
+//
+// The database connection is established when NewPostgresStorage is called, and it is closed when
+// Close is called on the returned PostgresStorage instance.
 func NewPostgresStorage(connStr string) (*PostgresStorage, error) {
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
@@ -41,6 +45,10 @@ func NewPostgresStorage(connStr string) (*PostgresStorage, error) {
 	}, nil
 }
 
+// Bootstrap migrates the database schema to the latest version.
+//
+// It is safe to call multiple times, as goose will only apply the
+// migrations that have not yet been applied.
 func (pg *PostgresStorage) Bootstrap(ctx context.Context) error {
 	provider, err := goose.NewProvider(
 		goose.DialectPostgres,
@@ -59,6 +67,7 @@ func (pg *PostgresStorage) Bootstrap(ctx context.Context) error {
 	return nil
 }
 
+// Close closes the underlying database connection.
 func (pg *PostgresStorage) Close() error {
 	if err := pg.db.Close(); err != nil {
 		return fmt.Errorf("db.Close: %w", err)
@@ -67,6 +76,7 @@ func (pg *PostgresStorage) Close() error {
 	return nil
 }
 
+// Ping pings the underlying database connection.
 func (pg *PostgresStorage) Ping(ctx context.Context) error {
 	err := WithRetry(func() error {
 		if err := pg.db.PingContext(ctx); err != nil {

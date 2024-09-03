@@ -14,13 +14,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-resty/resty/v2"
+	"go.uber.org/zap"
+
 	"github.com/andymarkow/go-metrics-collector/internal/httpclient"
 	"github.com/andymarkow/go-metrics-collector/internal/models"
 	"github.com/andymarkow/go-metrics-collector/internal/signature"
-	"github.com/go-resty/resty/v2"
-	"go.uber.org/zap"
 )
 
+// Metric is an interface for metrics.
 type Metric interface {
 	Collect()
 	GetName() string
@@ -29,10 +31,12 @@ type Metric interface {
 	GetValueString() string
 }
 
+// Reseter is an interface for metrics that can be reset.
 type Reseter interface {
 	Reset()
 }
 
+// Monitor is a metrics monitor.
 type Monitor struct {
 	log            *zap.Logger
 	client         *httpclient.HTTPClient
@@ -45,6 +49,50 @@ type Monitor struct {
 	rateLimit      int
 }
 
+// NewMonitor creates a new Monitor with the given options.
+//
+// The Monitor is configured with the following metrics by default:
+//
+//   - Alloc: The number of bytes allocated and still in use.
+//   - BuckHashSys: The total size of the hash table used by the runtime.
+//   - Frees: The total number of frees.
+//   - GCCPUFraction: The fraction of CPU time spent in garbage collection.
+//   - GCSys: The total size of memory allocated by the garbage collector.
+//   - HeapAlloc: The number of bytes allocated and still in use.
+//   - HeapIdle: The number of bytes in idle spans.
+//   - HeapInuse: The number of bytes in in-use spans.
+//   - HeapObjects: The total number of objects.
+//   - HeapReleased: The number of bytes released to the OS.
+//   - HeapSys: The total size of the heap.
+//   - LastGC: The time of the last garbage collection.
+//   - Lookups: The total number of pointer lookups.
+//   - MCacheInuse: The number of bytes of mspan structures used by the runtime.
+//   - MCacheSys: The total size of memory allocated by the runtime for mspan
+//     structures.
+//   - MSpanInuse: The number of bytes of mspan structures used by the runtime.
+//   - MSpanSys: The total size of memory allocated by the runtime for mspan
+//     structures.
+//   - Mallocs: The total number of mallocs.
+//   - NextGC: The target heap size of the next garbage collection.
+//   - NumForcedGC: The total number of forced garbage collections.
+//   - NumGC: The total number of garbage collections.
+//   - OtherSys: The total size of memory allocated by the runtime for miscellaneous
+//     objects.
+//   - PauseTotalNs: The total pause time of all garbage collections.
+//   - PollCount: The total number of polls.
+//   - RandomValue: A random value between 0 and 1, sampled every second.
+//   - StackInuse: The number of bytes in use by the stack.
+//   - StackSys: The total size of the stack.
+//   - Sys: The total size of memory allocated by the runtime.
+//   - TotalAlloc: The total number of bytes allocated.
+//   - CPUutilization: The CPU utilization of the system.
+//   - FreeMemory: The amount of free memory on the system.
+//   - TotalMemory: The total amount of memory on the system.
+//
+// The Monitor also has the following options:
+//
+//   - HTTP client: The Monitor uses a custom HTTP client with a retry strategy
+//     that retries 3 times with exponential backoff.
 func NewMonitor(opts ...Option) *Monitor {
 	var memstat runtime.MemStats
 
@@ -100,12 +148,12 @@ func NewMonitor(opts ...Option) *Monitor {
 		gopsutilstats: gopsutilstats,
 	}
 
-	// Apply options
+	// Apply options.
 	for _, opt := range opts {
 		opt(mon)
 	}
 
-	// Configure the retry strategy
+	// Configure the retry strategy.
 	client.
 		SetLogger(mon.log.Sugar()).
 		SetRetryCount(3).                  // Number of retry attempts
@@ -113,7 +161,7 @@ func NewMonitor(opts ...Option) *Monitor {
 		SetRetryMaxWaitTime(10 * time.Second).
 		SetRetryAfter(retryAfterWithInterval(2)).
 		AddRetryCondition(func(_ *resty.Response, err error) bool {
-			// Retry for retryable errors
+			// Retry for retryable errors.
 			return isRetryableError(err)
 		})
 
@@ -137,36 +185,42 @@ func WithLogger(logger *zap.Logger) Option {
 	}
 }
 
+// WithServerAddr is a monitor option that sets server address.
 func WithServerAddr(addr string) Option {
 	return func(m *Monitor) {
 		m.client.SetBaseURL(addr)
 	}
 }
 
+// WithSignKey is a monitor option that sets sign key.
 func WithSignKey(signKey []byte) Option {
 	return func(m *Monitor) {
 		m.signKey = signKey
 	}
 }
 
+// WithPollInterval is a monitor option that sets poll interval.
 func WithPollInterval(pollInterval time.Duration) Option {
 	return func(m *Monitor) {
 		m.pollInterval = pollInterval
 	}
 }
 
+// WithReportInterval is a monitor option that sets report interval.
 func WithReportInterval(reportInterval time.Duration) Option {
 	return func(m *Monitor) {
 		m.reportInterval = reportInterval
 	}
 }
 
+// WithRateLimit is a monitor option that sets rate limit.
 func WithRateLimit(rateLimit int) Option {
 	return func(m *Monitor) {
 		m.rateLimit = rateLimit
 	}
 }
 
+// RunCollector runs the collector.
 func (m *Monitor) RunCollector(ctx context.Context) {
 	pollTicker := time.NewTicker(m.pollInterval)
 	defer pollTicker.Stop()
@@ -181,6 +235,7 @@ func (m *Monitor) RunCollector(ctx context.Context) {
 	}
 }
 
+// RunCollectorGopsutils runs the collector.
 func (m *Monitor) RunCollectorGopsutils(ctx context.Context) {
 	pollTicker := time.NewTicker(m.pollInterval)
 	defer pollTicker.Stop()
@@ -197,6 +252,11 @@ func (m *Monitor) RunCollectorGopsutils(ctx context.Context) {
 	}
 }
 
+// RunReporter runs the reporter.
+//
+// It starts a ticker that triggers every reportInterval.
+// When the ticker triggers, it calls ReportMetrics with the metrics
+// from the monitor and the gopsutil metrics.
 func (m *Monitor) RunReporter(ctx context.Context) {
 	reportTicker := time.NewTicker(m.reportInterval)
 	defer reportTicker.Stop()
@@ -220,6 +280,7 @@ func (m *Monitor) Collect() {
 	}
 }
 
+// reportWorker sends metrics to the remote server.
 func (m *Monitor) reportWorker(wg *sync.WaitGroup, metricsChan <-chan Metric) {
 	defer wg.Done()
 
@@ -285,6 +346,7 @@ func (m *Monitor) reportWorker(wg *sync.WaitGroup, metricsChan <-chan Metric) {
 	}
 }
 
+// ReportMetrics pushes metrics to the remote server.
 func (m *Monitor) ReportMetrics(metrics []Metric) {
 	metricsChan := make(chan Metric, m.rateLimit)
 
@@ -368,6 +430,7 @@ func (m *Monitor) Report() {
 	}
 }
 
+// sendRequest sends metrics to the remote server.
 func (m *Monitor) sendRequest(metrics []models.Metrics) error {
 	payload, err := json.Marshal(metrics)
 	if err != nil {

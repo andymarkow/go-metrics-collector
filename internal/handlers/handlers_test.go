@@ -9,11 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
-	"github.com/andymarkow/go-metrics-collector/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
+	"github.com/andymarkow/go-metrics-collector/internal/storage"
 )
 
 func newChiHTTPRequest(method, url string, urlParams map[string]string, body io.Reader) *http.Request {

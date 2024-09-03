@@ -7,6 +7,27 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// NewZapLogger creates a new logger with the given log level.
+//
+// The logger is configured with the ProductionEncoder, which is a JSON
+// encoder that outputs logs in the following format:
+//
+//	{
+//	  "level": "INFO",
+//	  "ts": 1598059584.776,
+//	  "logger": "example",
+//	  "caller": "example/main.go:11",
+//	  "msg": "Hello, world!",
+//	  "number": 42,
+//	  "null": null,
+//	  "object": {
+//	    "bar": "baz"
+//	  },
+//	  "bool": true,
+//	  "string": "hello"
+//	}
+//
+// The log level must be one of: "debug", "info", "warn", "error", "fatal".
 func NewZapLogger(level string) (*zap.Logger, error) {
 	encoderCfg := zap.NewProductionEncoderConfig()
 	encoderCfg.TimeKey = "time"

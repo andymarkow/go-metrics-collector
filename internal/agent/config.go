@@ -8,6 +8,7 @@ import (
 	"github.com/caarlos0/env"
 )
 
+// config represents the agent configuration.
 type config struct {
 	ServerAddr     string `env:"ADDRESS"`
 	LogLevel       string `env:"LOG_LEVEL"`
@@ -17,6 +18,7 @@ type config struct {
 	RateLimit      int    `env:"RATE_LIMIT"`
 }
 
+// newConfig creates a new config for agent.
 func newConfig() (config, error) {
 	cfg := config{}
 
@@ -32,7 +34,7 @@ func newConfig() (config, error) {
 		return cfg, fmt.Errorf("env.Parse: %w", err)
 	}
 
-	// Check if the URL does not start with "http://" or "https://"
+	// Check if the URL does not start with "http://" or "https://".
 	if !strings.HasPrefix(cfg.ServerAddr, "http://") &&
 		!strings.HasPrefix(cfg.ServerAddr, "https://") {
 		cfg.ServerAddr = "http://" + cfg.ServerAddr

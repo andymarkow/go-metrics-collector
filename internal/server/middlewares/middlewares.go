@@ -4,10 +4,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
-	"github.com/andymarkow/go-metrics-collector/internal/monitor"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
+
+	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
+	"github.com/andymarkow/go-metrics-collector/internal/monitor"
 )
 
 // Middlewares is a collection of router middlewares.
@@ -18,7 +19,7 @@ type Middlewares struct {
 
 // New creates new Middlewares instance.
 func New(opts ...Option) *Middlewares {
-	// Default Middleware options
+	// Default Middleware options.
 	mw := &Middlewares{
 		log: zap.Must(zap.NewDevelopment()),
 	}

@@ -11,15 +11,16 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
+
 	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
 	"github.com/andymarkow/go-metrics-collector/internal/models"
 	"github.com/andymarkow/go-metrics-collector/internal/monitor"
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
-	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 )
 
-// Handlers is a collection of handlers.
+// Handlers is a collection of router handlers.
 type Handlers struct {
 	storage storage.Storage
 	log     *zap.Logger
@@ -40,16 +41,17 @@ func NewHandlers(strg storage.Storage, opts ...Option) *Handlers {
 	return handlers
 }
 
-// Option is a functional option for Handlers.
+// Option is a functional option type for Handlers.
 type Option func(h *Handlers)
 
-// WithLogger is a option for Handlers that sets logger.
+// WithLogger is an option for Handlers instance that sets logger.
 func WithLogger(logger *zap.Logger) Option {
 	return func(h *Handlers) {
 		h.log = logger
 	}
 }
 
+// parseGaugeMetricValue parses gauge metric value from string.
 func parseGaugeMetricValue(s string) (float64, error) {
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
@@ -59,6 +61,7 @@ func parseGaugeMetricValue(s string) (float64, error) {
 	return v, nil
 }
 
+// handleError handles error response.
 func (h *Handlers) handleError(
 	w http.ResponseWriter, err error, statusCode int,
 ) {
@@ -66,6 +69,7 @@ func (h *Handlers) handleError(
 	http.Error(w, err.Error(), statusCode)
 }
 
+// Ping handles ping request.
 func (h *Handlers) Ping(w http.ResponseWriter, r *http.Request) {
 	if err := h.storage.Ping(r.Context()); err != nil {
 		h.handleError(w, err, http.StatusInternalServerError)
@@ -78,6 +82,7 @@ func (h *Handlers) Ping(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK"))
 }
 
+// GetAllMetrics handles get all metrics request.
 func (h *Handlers) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
