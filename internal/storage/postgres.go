@@ -340,7 +340,7 @@ func WithRetry(operation func() error) error {
 
 	var err error
 
-	for i := 0; i < retryCount; i++ {
+	for i := range retryCount {
 		err = operation()
 		if err == nil {
 			return nil
@@ -358,8 +358,6 @@ func WithRetry(operation func() error) error {
 
 	return fmt.Errorf("retry attempts exceeded: %w", err)
 }
-
-// TODO: Lock/Unlock.
 
 // isRetryableError checks if error is retryable.
 func isRetryableError(err error) bool {
