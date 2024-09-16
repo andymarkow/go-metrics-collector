@@ -40,9 +40,11 @@ func (m *Middlewares) HashSumValidator(next http.Handler) http.Handler {
 			return
 		}
 
-		m.log.Info("signature orig", zap.Any("sign", sign))
+		m.log.Debug("body payload calculated signature", zap.Any("hashsum", sign))
 
-		signHeader, err := hex.DecodeString(r.Header.Get("HashSHA256")) //nolint:canonicalheader,nolintlint
+		headerHashSum := r.Header.Get("HashSHA256") //nolint:canonicalheader,nolintlint
+
+		signHeader, err := hex.DecodeString(headerHashSum)
 		if err != nil {
 			m.log.Error("decode signature", zap.Error(err))
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -50,7 +52,9 @@ func (m *Middlewares) HashSumValidator(next http.Handler) http.Handler {
 			return
 		}
 
-		m.log.Info("signature head", zap.Any("sign", signHeader))
+		m.log.Debug("body payload provided signature", zap.Any("hashsum", signHeader))
+
+		m.log.Debug("encoded body payload signature", zap.Any("hashsum", headerHashSum))
 
 		if !hmac.Equal(sign, signHeader) {
 			m.log.Error("signature mismatch", zap.Error(errormsg.ErrHashSumValueMismatch))

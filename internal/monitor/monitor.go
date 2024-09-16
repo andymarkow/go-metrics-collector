@@ -5,6 +5,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -18,6 +21,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
 
+	"github.com/andymarkow/go-metrics-collector/internal/cryptutils"
 	"github.com/andymarkow/go-metrics-collector/internal/httpclient"
 	"github.com/andymarkow/go-metrics-collector/internal/models"
 	"github.com/andymarkow/go-metrics-collector/internal/signature"
@@ -45,6 +49,7 @@ type Monitor struct {
 	metrics        []Metric
 	gopsutilstats  []Metric
 	signKey        []byte
+	cryptoPubKey   *rsa.PublicKey
 	pollInterval   time.Duration
 	reportInterval time.Duration
 	rateLimit      int
@@ -197,6 +202,13 @@ func WithServerAddr(addr string) Option {
 func WithSignKey(signKey []byte) Option {
 	return func(m *Monitor) {
 		m.signKey = signKey
+	}
+}
+
+// WithCryptoPubKey is a monitor option that sets crypto public key.
+func WithCryptoPubKey(cryptoPubKey *rsa.PublicKey) Option {
+	return func(m *Monitor) {
+		m.cryptoPubKey = cryptoPubKey
 	}
 }
 
@@ -438,38 +450,39 @@ func (m *Monitor) sendRequest(metrics []models.Metrics) error {
 		return fmt.Errorf("json.Marshal: %w", err)
 	}
 
-	buf := bytes.NewBuffer(nil)
-	zbuf := gzip.NewWriter(buf)
-	defer func() {
-		if err := zbuf.Close(); err != nil {
-			m.log.Error("zbuf.Close: " + err.Error())
-		}
-	}()
-
-	if _, err := zbuf.Write(payload); err != nil {
-		return fmt.Errorf("zbuf.Write: %w", err)
-	}
-	if err := zbuf.Close(); err != nil {
-		return fmt.Errorf("zbuf.Close: %w", err)
-	}
-
-	body := buf.Bytes()
-
+	// Calculate hash sum of the payload with a signature key.
 	if len(m.signKey) > 0 {
 		sign, err := signature.CalculateHashSum(m.signKey, payload)
 		if err != nil {
 			return fmt.Errorf("signPayload: %w", err)
 		}
 
-		m.log.Debug("signanure", zap.String("sign", hex.EncodeToString(sign)))
+		m.log.Debug("payload signature", zap.String("hashsum", hex.EncodeToString(sign)))
 
 		m.client.SetHeader("HashSHA256", hex.EncodeToString(sign))
 	}
 
+	// Compress payload data with gzip compression method.
+	body, err := compressDataGzip(payload)
+	if err != nil {
+		return fmt.Errorf("failed to compress payload data with gzip: %w", err)
+	}
+
+	// Encrypt payload data with a public RSA key.
+	cryptoHash := sha256.New()
+
+	encryptedBody, err := cryptutils.EncryptOAEP(cryptoHash, rand.Reader, m.cryptoPubKey, body, nil)
+	if err != nil {
+		return fmt.Errorf("cryptutils.EncryptOAEP: %w", err)
+	}
+
+	m.log.Debug("encrypted payload content", zap.Any("data", encryptedBody))
+
+	// Send payload data to the remote server.
 	_, err = m.client.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Content-Encoding", "gzip").
-		SetBody(body).
+		SetBody(encryptedBody).
 		Post("/updates")
 	if err != nil {
 		return fmt.Errorf("client.Request: %w", err)
@@ -513,4 +526,26 @@ func isRetryableError(err error) bool {
 	var opErr *net.OpError
 
 	return errors.As(err, &opErr)
+}
+
+// compressDataGzip compresses the given data using gzip.
+//
+// The function writes the given data to a gzip writer and then closes the writer.
+// If any error occurs while writing or closing, the function returns the error.
+//
+// If no error occurs, the function returns the compressed data as a byte slice.
+func compressDataGzip(data []byte) ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+
+	zbuf := gzip.NewWriter(buf)
+
+	if _, err := zbuf.Write(data); err != nil {
+		return nil, fmt.Errorf("zbuf.Write: %w", err)
+	}
+
+	if err := zbuf.Close(); err != nil {
+		return nil, fmt.Errorf("zbuf.Close: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }

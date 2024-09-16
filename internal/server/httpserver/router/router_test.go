@@ -1,4 +1,4 @@
-package server
+package router
 
 import (
 	"io"
@@ -14,10 +14,11 @@ import (
 )
 
 func TestMetricValidatorMW(t *testing.T) {
-	srv, err := NewServer()
-	assert.NoError(t, err)
+	store := storage.NewMemStorage()
 
-	ts := httptest.NewServer(srv.srv.Handler)
+	mux := NewRouter(store)
+
+	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
 	testCases := []struct {
@@ -56,7 +57,7 @@ func TestMetricValidatorMW(t *testing.T) {
 func TestRouter(t *testing.T) {
 	strg := storage.NewMemStorage()
 
-	router := newRouter(strg)
+	router := NewRouter(strg)
 
 	ts := httptest.NewServer(router)
 	defer ts.Close()

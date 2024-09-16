@@ -12,6 +12,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/andymarkow/go-metrics-collector/internal/cryptutils"
 	"github.com/andymarkow/go-metrics-collector/internal/logger"
 	"github.com/andymarkow/go-metrics-collector/internal/monitor"
 )
@@ -37,10 +38,16 @@ func NewAgent() (*Agent, error) {
 		return nil, fmt.Errorf("logger.NewZapLogger: %w", err)
 	}
 
+	publicKey, err := cryptutils.LoadRSAPublicKey(cfg.CryptoKey)
+	if err != nil {
+		return nil, fmt.Errorf("cryptutils.LoadRSAPublicKey: %w", err)
+	}
+
 	mon := monitor.NewMonitor(
 		monitor.WithLogger(log),
 		monitor.WithServerAddr(cfg.ServerAddr),
 		monitor.WithSignKey([]byte(cfg.SignKey)),
+		monitor.WithCryptoPubKey(publicKey),
 		monitor.WithPollInterval(time.Duration(cfg.PollInterval)*time.Second),
 		monitor.WithReportInterval(time.Duration(cfg.ReportInterval)*time.Second),
 		monitor.WithRateLimit(cfg.RateLimit),
