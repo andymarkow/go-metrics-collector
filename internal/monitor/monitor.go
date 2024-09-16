@@ -46,10 +46,10 @@ type Monitor struct {
 	log            *zap.Logger
 	client         *httpclient.HTTPClient
 	memstat        *runtime.MemStats
+	cryptoPubKey   *rsa.PublicKey
+	signKey        []byte
 	metrics        []Metric
 	gopsutilstats  []Metric
-	signKey        []byte
-	cryptoPubKey   *rsa.PublicKey
 	pollInterval   time.Duration
 	reportInterval time.Duration
 	rateLimit      int
