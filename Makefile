@@ -19,9 +19,7 @@ all: fmt tidy test lint
 
 fmt:
 	go fmt ./...
-	export GOPATH=$(HOME)/go
-	export PATH=$(PATH):$(GOPATH)/bin
-	goimports -l -w --local "github.com/andymarkow/go-metrics-collector" .
+	$(HOME)/go/bin/goimports -l -w --local "github.com/andymarkow/go-metrics-collector" .
 
 tidy:
 	go mod tidy
@@ -42,8 +40,12 @@ vet:
 	go vet ./...
 
 lint:
+	$(HOME)/go/bin/staticcheck -fail "" ./...
 	docker run --rm --name golangci-lint -v `pwd`:/workspace -w /workspace \
 		golangci/golangci-lint:latest-alpine golangci-lint run --issues-exit-code 1
+
+staticlint:
+	go run ./cmd/staticlint ./...
 
 test:
 	go clean -testcache

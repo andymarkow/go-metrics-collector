@@ -1,3 +1,4 @@
+// Package server provides a metrics server implementation.
 package server
 
 import (
@@ -19,11 +20,11 @@ import (
 
 // Server represents a metrics server.
 type Server struct {
-	srv           *http.Server
 	log           *zap.Logger
+	srv           *http.Server
 	storage       storage.Storage
-	storeInterval time.Duration
 	storeFile     string
+	storeInterval time.Duration
 	restoreOnBoot bool
 }
 
@@ -42,7 +43,7 @@ func NewServer() (*Server, error) {
 	var strg storage.Storage = storage.NewMemStorage()
 
 	if cfg.DatabaseDSN != "" {
-		pgStorage, err := storage.NewPostgresStorage(cfg.DatabaseDSN)
+		pgStorage, err := storage.NewPostgresStorage(cfg.DatabaseDSN, storage.WithLogger(log))
 		if err != nil {
 			return nil, fmt.Errorf("storage.NewPostgresStorage: %w", err)
 		}
@@ -91,7 +92,11 @@ func (s *Server) LoadDataFromFile() error {
 	if err != nil {
 		return fmt.Errorf("datamanager.NewDataManager: %w", err)
 	}
-	defer dataLoader.Close()
+	defer func() {
+		if err := dataLoader.Close(); err != nil {
+			s.log.Sugar().Errorf("dataLoader.Close: %v", err)
+		}
+	}()
 
 	s.log.Sugar().Infof("Loading data from file '%s'", dataLoader.GetFilename())
 
@@ -110,7 +115,11 @@ func (s *Server) SaveDataToFile(ctx context.Context, wg *sync.WaitGroup) error {
 	if err != nil {
 		return fmt.Errorf("datamanager.NewDataSaver: %w", err)
 	}
-	defer dataSaver.Close()
+	defer func() {
+		if err := dataSaver.Close(); err != nil {
+			s.log.Sugar().Errorf("dataSaver.Close: %v", err)
+		}
+	}()
 
 	storeTicker := time.NewTicker(s.storeInterval)
 	defer storeTicker.Stop()

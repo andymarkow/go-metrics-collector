@@ -116,7 +116,10 @@ func TestGetAllMetricsHandler(t *testing.T) {
 			assert.Equal(t, tc.want.contentType, resp.Header.Get("Content-Type"))
 			assert.Equal(t, tc.want.statusCode, resp.StatusCode)
 
-			defer resp.Body.Close()
+			defer func() {
+				require.NoError(t, resp.Body.Close())
+			}()
+
 			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			assert.NotEqual(t, "", string(body))
@@ -128,8 +131,8 @@ func TestGetAllMetricsHandler(t *testing.T) {
 func TestGetMetricHandler(t *testing.T) {
 	type want struct {
 		contentType string
-		statusCode  int
 		response    string
+		statusCode  int
 	}
 
 	strg := storage.NewMemStorage()
@@ -224,7 +227,9 @@ func TestGetMetricHandler(t *testing.T) {
 			h.GetMetric(w, req)
 
 			resp := w.Result()
-			defer resp.Body.Close()
+			defer func() {
+				require.NoError(t, resp.Body.Close())
+			}()
 
 			assert.Equal(t, tc.want.contentType, resp.Header.Get("Content-Type"))
 			assert.Equal(t, tc.want.statusCode, resp.StatusCode)
@@ -236,8 +241,8 @@ func TestGetMetricHandler(t *testing.T) {
 func TestUpdateMetricHandler(t *testing.T) {
 	type want struct {
 		contentType string
-		statusCode  int
 		response    string
+		statusCode  int
 	}
 
 	type metric struct {
@@ -351,7 +356,10 @@ func TestUpdateMetricHandler(t *testing.T) {
 			assert.Equal(t, tc.want.statusCode, resp.StatusCode)
 			assert.Equal(t, tc.want.contentType, resp.Header.Get("Content-Type"))
 
-			defer resp.Body.Close()
+			defer func() {
+				require.NoError(t, resp.Body.Close())
+			}()
+
 			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want.response, string(body))
@@ -363,8 +371,8 @@ func TestUpdateMetricHandler(t *testing.T) {
 func TestGetMetricJSONHandler(t *testing.T) {
 	type want struct {
 		contentType string
-		statusCode  int
 		response    string
+		statusCode  int
 	}
 
 	strg := storage.NewMemStorage()
@@ -476,7 +484,9 @@ func TestGetMetricJSONHandler(t *testing.T) {
 			h.GetMetricJSON(w, req)
 
 			resp := w.Result()
-			defer resp.Body.Close()
+			defer func() {
+				require.NoError(t, resp.Body.Close())
+			}()
 
 			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
@@ -495,8 +505,8 @@ func TestGetMetricJSONHandler(t *testing.T) {
 func TestUpdateMetricJSONHandler(t *testing.T) {
 	type want struct {
 		contentType string
-		statusCode  int
 		response    string
+		statusCode  int
 	}
 
 	strg := storage.NewMemStorage()
@@ -618,7 +628,9 @@ func TestUpdateMetricJSONHandler(t *testing.T) {
 			h.UpdateMetricJSON(w, req)
 
 			resp := w.Result()
-			defer resp.Body.Close()
+			defer func() {
+				require.NoError(t, resp.Body.Close())
+			}()
 
 			assert.Equal(t, tc.want.statusCode, resp.StatusCode)
 			assert.Equal(t, tc.want.contentType, resp.Header.Get("Content-Type"))

@@ -105,7 +105,11 @@ func (m *Middlewares) Compress(next http.Handler) http.Handler {
 			// меняем оригинальный http.ResponseWriter на новый
 			ow = cw
 			// не забываем отправить клиенту все сжатые данные после завершения middleware
-			defer cw.Close()
+			defer func() {
+				if err := cw.Close(); err != nil {
+					m.log.Error("cw.Close: " + err.Error())
+				}
+			}()
 		}
 
 		// проверяем, что клиент отправил серверу сжатые данные в формате gzip
@@ -122,7 +126,11 @@ func (m *Middlewares) Compress(next http.Handler) http.Handler {
 			// меняем тело запроса на новое
 			r.Body = cr
 
-			defer cr.Close()
+			defer func() {
+				if err := cr.Close(); err != nil {
+					m.log.Error("cr.Close: " + err.Error())
+				}
+			}()
 		}
 
 		// передаём управление хендлеру

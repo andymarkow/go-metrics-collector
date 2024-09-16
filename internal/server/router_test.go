@@ -41,7 +41,9 @@ func TestMetricValidatorMW(t *testing.T) {
 			resp, err := ts.Client().Do(req)
 			require.NoError(t, err)
 
-			defer resp.Body.Close()
+			defer func() {
+				require.NoError(t, resp.Body.Close())
+			}()
 
 			_, err = io.ReadAll(resp.Body)
 			require.NoError(t, err)
@@ -61,8 +63,8 @@ func TestRouter(t *testing.T) {
 
 	type want struct {
 		contentType  string
-		statusCode   int
 		response     string
+		statusCode   int
 		wantResponse bool
 	}
 
@@ -186,7 +188,9 @@ func TestRouter(t *testing.T) {
 			resp, err := ts.Client().Do(req)
 			require.NoError(t, err)
 
-			defer resp.Body.Close()
+			defer func() {
+				require.NoError(t, resp.Body.Close())
+			}()
 
 			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)

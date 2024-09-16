@@ -1,3 +1,4 @@
+// Package httpclient provides a wrapper for resty.Client.
 package httpclient
 
 import (

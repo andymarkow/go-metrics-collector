@@ -1,3 +1,4 @@
+// Package signature provides functions to calculate SHA256 hash sum with a key.
 package signature
 
 import (
