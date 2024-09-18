@@ -462,27 +462,27 @@ func (m *Monitor) sendRequest(metrics []models.Metrics) error {
 		m.client.SetHeader("HashSHA256", hex.EncodeToString(sign))
 	}
 
-	// Compress payload data with gzip compression method.
-	body, err := compressDataGzip(payload)
-	if err != nil {
-		return fmt.Errorf("failed to compress payload data with gzip: %w", err)
-	}
-
 	// Encrypt payload data with a public RSA key.
 	cryptoHash := sha256.New()
 
-	encryptedBody, err := cryptutils.EncryptOAEP(cryptoHash, rand.Reader, m.cryptoPubKey, body, nil)
+	encryptedBody, err := cryptutils.EncryptOAEP(cryptoHash, rand.Reader, m.cryptoPubKey, payload, nil)
 	if err != nil {
 		return fmt.Errorf("cryptutils.EncryptOAEP: %w", err)
 	}
 
 	m.log.Debug("encrypted payload content", zap.Any("data", encryptedBody))
 
+	// Compress payload data with gzip compression method.
+	body, err := compressDataGzip(encryptedBody)
+	if err != nil {
+		return fmt.Errorf("failed to compress payload data with gzip: %w", err)
+	}
+
 	// Send payload data to the remote server.
 	_, err = m.client.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Content-Encoding", "gzip").
-		SetBody(encryptedBody).
+		SetBody(body).
 		Post("/updates")
 	if err != nil {
 		return fmt.Errorf("client.Request: %w", err)

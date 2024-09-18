@@ -57,20 +57,24 @@ func NewRouter(store storage.Storage, opts ...Option) *chi.Mux {
 	r.Get("/ping", h.Ping)
 	r.With(mw.Compress).Get("/", h.GetAllMetrics)
 
-	r.With(mw.Compress).Group(func(r chi.Router) {
+	r.Group(func(r chi.Router) {
+		r.Use(mw.Compress)
 		r.Use(mw.MetricValidator)
+
 		r.Get("/value/{metricType}/{metricName}", h.GetMetric)
 		r.Post("/update/{metricType}/{metricName}/{metricValue}", h.UpdateMetric)
 	})
 
-	r.With(mw.Compress).Group(func(r chi.Router) {
+	r.Group(func(r chi.Router) {
+		r.Use(mw.Compress)
+
 		r.Post("/value", h.GetMetricJSON)
 		r.Post("/update", h.UpdateMetricJSON)
 	})
 
 	r.Group(func(r chi.Router) {
-		r.Use(mw.Cryptography)
 		r.Use(mw.Compress)
+		r.Use(mw.Cryptography)
 
 		if useHashSumValidator {
 			r.Use(mw.HashSumValidator)
