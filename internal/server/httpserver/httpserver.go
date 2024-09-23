@@ -2,6 +2,7 @@
 package httpserver
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -76,7 +77,17 @@ func (s *HTTPServer) Start() error {
 	s.log.Info("Starting HTTP server", zap.String("addr", s.server.Addr))
 
 	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("http.ListenAndServe: %w", err)
+		return fmt.Errorf("server.ListenAndServe: %w", err)
+	}
+
+	return nil
+}
+
+func (s *HTTPServer) Shutdown(ctx context.Context) error {
+	s.log.Info("Shutting down HTTP server")
+
+	if err := s.server.Shutdown(ctx); err != nil {
+		return fmt.Errorf("server.Shutdown: %w", err)
 	}
 
 	return nil
