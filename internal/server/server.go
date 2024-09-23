@@ -95,66 +95,23 @@ func NewServer() (*Server, error) {
 }
 
 // Close closes the server.
-func (s *Server) Close() {
+func (s *Server) Close() error {
 	if err := s.storage.Close(); err != nil {
-		s.log.Error("storage.Close", zap.Error(err))
-	}
-}
-
-// LoadDataFromFile loads the metrics data from the file.
-func (s *Server) LoadDataFromFile(ctx context.Context) error {
-	dataLoader, err := datamanager.NewDataLoader(s.storage, s.storeFile)
-	if err != nil {
-		return fmt.Errorf("datamanager.NewDataManager: %w", err)
-	}
-
-	s.log.Sugar().Infof("Loading data from file %s", s.storeFile)
-
-	if err := dataLoader.Load(ctx); err != nil {
-		return fmt.Errorf("dataLoader.Load: %w", err)
+		return fmt.Errorf("storage.Close: %w", err)
 	}
 
 	return nil
 }
 
-// SaveDataToFile saves the metrics data to the file.
-func (s *Server) SaveDataToFile(ctx context.Context, wg *sync.WaitGroup) error {
-	defer wg.Done()
-
-	dataSaver, err := datamanager.NewDataSaver(s.storage, s.storeFile)
-	if err != nil {
-		return fmt.Errorf("datamanager.NewDataSaver: %w", err)
-	}
-	defer func() {
-		if err := dataSaver.Close(context.Background()); err != nil {
-			s.log.Sugar().Errorf("dataSaver.Close: %v", err)
-		}
-	}()
-
-	storeTicker := time.NewTicker(s.storeInterval)
-	defer storeTicker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-
-			if err := dataSaver.PurgeAndSave(context.TODO()); err != nil { //nolint:contextcheck
-				return fmt.Errorf("dataSaver.PurgeAndSave: %w", err)
-			}
-
-			return nil
-
-		case <-storeTicker.C:
-			if err := dataSaver.PurgeAndSave(context.TODO()); err != nil { //nolint:contextcheck
-				s.log.Sugar().Errorf("dataSaver.PurgeAndSave: %v", err)
-			}
-		}
-	}
-}
-
 // Start starts the server.
 func (s *Server) Start() error {
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			s.log.Error("failed to close server", zap.Error(err))
+
+			return
+		}
+	}()
 
 	if s.restoreOnBoot {
 		if err := s.datamgr.Load(context.Background()); err != nil {
