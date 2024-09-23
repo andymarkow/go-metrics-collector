@@ -96,7 +96,7 @@ func (a *Agent) Start() error {
 
 	// Graceful shutdown by OS signals.
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	<-quit
 	a.log.Sugar().Infof("Gracefully shutting down agent...")
