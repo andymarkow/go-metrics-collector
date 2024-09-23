@@ -1,0 +1,9 @@
+{
+    "address": "localhost:8080",
+    "crypto_key": "./tls/private.key",
+    "database_dsn": "",
+    "key": "",
+    "restore": true,
+    "store_file": "/tmp/metrics-db.json",
+    "store_interval": 300
+}

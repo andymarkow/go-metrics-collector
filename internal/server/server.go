@@ -67,14 +67,14 @@ func NewServer() (*Server, error) {
 	}
 
 	r := router.NewRouter(store,
+		router.WithCryptoPrivateKey(privateKey),
 		router.WithLogger(log),
 		router.WithSignKey([]byte(cfg.SignKey)),
-		router.WithCryptoPrivateKey(privateKey),
 	)
 
 	srv := httpserver.NewHTTPServer(r,
-		httpserver.WithServerAddr(cfg.ServerAddr),
 		httpserver.WithLogger(log),
+		httpserver.WithServerAddr(cfg.ServerAddr),
 	)
 
 	return &Server{

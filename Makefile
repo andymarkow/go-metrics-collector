@@ -9,7 +9,7 @@
 LOG_LEVEL=debug
 RESTORE=false
 STORE_INTERVAL=10
-FILE_STORAGE_PATH=
+FILE_STORAGE_PATH=./metrics-db.json
 KEY=secretkey
 # DATABASE_DSN=postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
 
