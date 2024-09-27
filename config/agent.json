@@ -1,0 +1,8 @@
+{
+    "address": "localhost:8080",
+    "crypto_key": "./tls/public.key",
+    "key": "",
+    "poll_interval": 2,
+    "report_interval": 10,
+    "rate_limit": 1
+}
