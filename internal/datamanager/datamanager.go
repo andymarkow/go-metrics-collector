@@ -8,139 +8,169 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
+	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
 )
 
-// DataSaver is a metrics data saver to the file.
-type DataSaver struct {
-	file    *os.File
-	encoder *json.Encoder
-	storage storage.Storage
+// DataManager represents a data manager to load and save metrics data.
+type DataManager struct {
+	storeInterval time.Duration
+	log           *zap.Logger
+	storage       storage.Storage
+	file          string
 }
 
-// NewDataSaver creates a new DataSaver instance.
-//
-// It opens the file with the specified name and creates a new json.Encoder
-// from the file. The encoder is used to encode the metrics data into a JSON
-// format. If the file doesn't exist, it will be created.
+// NewDataManager creates a new DataManager instance.
 //
 // The storage parameter is required to store the metrics data and is used
-// in the Save and PurgeAndSave methods.
-func NewDataSaver(fileName string, storage storage.Storage) (*DataSaver, error) {
-	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("os.OpenFile: %w", err)
+// in the Load and Save methods.
+func NewDataManager(storage storage.Storage, file string, opts ...Option) *DataManager {
+	dm := &DataManager{
+		log:           zap.NewNop(),
+		file:          file,
+		storage:       storage,
+		storeInterval: 300 * time.Second,
 	}
 
-	return &DataSaver{
-		file:    file,
-		encoder: json.NewEncoder(file),
-		storage: storage,
-	}, nil
+	// Apply options.
+	for _, opt := range opts {
+		opt(dm)
+	}
+
+	return dm
 }
 
-// Close closes the data saver.
-func (d *DataSaver) Close() error {
-	if err := d.file.Close(); err != nil {
-		return fmt.Errorf("file.Close: %w", err)
+// Option represents a data manager option.
+type Option func(d *DataManager)
+
+// WithLogger sets the logger for the data manager.
+func WithLogger(logger *zap.Logger) Option {
+	return func(d *DataManager) {
+		d.log = logger
+	}
+}
+
+// WithStoreInterval sets the store interval for the data manager.
+func WithStoreInterval(storeInterval time.Duration) Option {
+	return func(d *DataManager) {
+		d.storeInterval = storeInterval
+	}
+}
+
+// Load loads the metrics data from the file.
+func (m *DataManager) Load(ctx context.Context) error {
+	m.log.Sugar().Infof("Loading data from file %s", m.file)
+
+	data := make(map[string]storage.Metric)
+
+	if err := readDataFromFile(m.file, &data); err != nil {
+		return fmt.Errorf("failed to read data from file: %w", err)
+	}
+
+	if err := m.storage.LoadData(ctx, data); err != nil {
+		return fmt.Errorf("storage.LoadData: %w", err)
 	}
 
 	return nil
 }
 
-// Save saves the metrics data to the file.
-func (d *DataSaver) Save() error {
-	ctx := context.TODO()
-
-	data, err := d.storage.GetAllMetrics(ctx)
+func (m *DataManager) Save(ctx context.Context, file *os.File) error {
+	data, err := m.storage.GetAllMetrics(ctx)
 	if err != nil {
 		return fmt.Errorf("storage.GetAllMetrics: %w", err)
 	}
 
-	d.encoder.SetIndent("", "\t")
-
-	if err := d.encoder.Encode(&data); err != nil {
-		return fmt.Errorf("encoder.Encode: %w", err)
+	if err := writeDataToFile(file, data); err != nil {
+		return fmt.Errorf("failed to write data to file: %w", err)
 	}
 
 	return nil
 }
 
-// PurgeAndSave purges the file and saves the metrics data.
-func (d *DataSaver) PurgeAndSave() error {
-	if err := d.file.Truncate(0); err != nil {
-		return fmt.Errorf("file.Truncate: %w", err)
-	}
+func (m *DataManager) RunDataSaver(ctx context.Context, wg *sync.WaitGroup) error {
+	defer wg.Done()
 
-	if _, err := d.file.Seek(0, 0); err != nil {
-		return fmt.Errorf("file.Seek: %w", err)
-	}
+	m.log.Info("Starting data saver")
+	m.log.Sugar().Infof("Saving data every %s to the file %s", m.storeInterval.String(), m.file)
 
-	if err := d.Save(); err != nil {
-		return fmt.Errorf("d.Save: %w", err)
-	}
-
-	return nil
-}
-
-// DataLoader is a metrics data loader from the file.
-type DataLoader struct {
-	file    *os.File
-	decoder *json.Decoder
-	storage storage.Storage
-}
-
-// NewDataLoader creates a new DataLoader instance.
-//
-// It opens the file with the specified name and creates a new json.Decoder
-// from the file. The decoder is used to decode the file content into a
-// Metrics struct. If the file doesn't exist, it will be created.
-//
-// The storage parameter is required to store the metrics data and is used
-// in the Load method.
-func NewDataLoader(fileName string, storage storage.Storage) (*DataLoader, error) {
-	file, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0644)
+	f, err := os.OpenFile(m.file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("os.OpenFile: %w", err)
+		return fmt.Errorf("os.OpenFile: %w", err)
 	}
 
-	return &DataLoader{
-		file:    file,
-		decoder: json.NewDecoder(file),
-		storage: storage,
-	}, nil
-}
+	storeTicker := time.NewTicker(m.storeInterval)
+	defer storeTicker.Stop()
 
-// Close closes the data loader.
-func (d *DataLoader) Close() error {
-	if err := d.file.Close(); err != nil {
-		return fmt.Errorf("file.Close: %w", err)
+	for {
+		select {
+		case <-ctx.Done():
+			m.log.Info("Stopping data saver")
+			m.log.Sugar().Infof("Flushing data to store file %s", m.file)
+
+			if err := m.Save(ctx, f); err != nil {
+				m.log.Error("failed to save data to store file", zap.Error(err))
+			}
+
+			if err := f.Close(); err != nil {
+				return fmt.Errorf("file.Close: %w", err)
+			}
+
+			return nil
+
+		case <-storeTicker.C:
+			if err := m.Save(ctx, f); err != nil {
+				m.log.Error("failed to save data to store file", zap.Error(err))
+			}
+		}
 	}
-
-	return nil
 }
 
-// GetFilename returns the name of the file.
-func (d *DataLoader) GetFilename() string {
-	return d.file.Name()
-}
+func readDataFromFile(file string, data any) error {
+	f, err := os.OpenFile(file, os.O_CREATE|os.O_RDONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("os.OpenFile: %w", err)
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			return
+		}
+	}()
 
-// Load loads the metrics data from the file.
-func (d *DataLoader) Load() error {
-	data := make(map[string]storage.Metric)
-
-	err := d.decoder.Decode(&data)
+	err = json.NewDecoder(f).Decode(&data)
 	if errors.Is(err, io.EOF) {
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("decoder.Decode: %w", err)
 	}
 
-	ctx := context.Background()
+	return nil
+}
 
-	if err := d.storage.LoadData(ctx, data); err != nil {
-		return fmt.Errorf("storage.LoadData: %w", err)
+func writeDataToFile(file *os.File, data any) error {
+	// Truncate the file content to 0.
+	if err := file.Truncate(0); err != nil {
+		return fmt.Errorf("file.Truncate: %w", err)
+	}
+
+	// Move the cursor to the beginning of the file.
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("file.Seek: %w", err)
+	}
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "\t")
+
+	if err := encoder.Encode(&data); err != nil {
+		return fmt.Errorf("encoder.Encode: %w", err)
+	}
+
+	// Sync the file content and write it to the disk.
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("file.Sync: %w", err)
 	}
 
 	return nil

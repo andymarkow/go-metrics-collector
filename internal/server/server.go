@@ -24,6 +24,7 @@ import (
 type Server struct {
 	log           *zap.Logger
 	httpsrv       *httpserver.HTTPServer
+	datamgr       *datamanager.DataManager
 	storage       storage.Storage
 	storeFile     string
 	storeInterval time.Duration
@@ -77,9 +78,15 @@ func NewServer() (*Server, error) {
 		httpserver.WithServerAddr(cfg.ServerAddr),
 	)
 
+	datamgr := datamanager.NewDataManager(store, cfg.StoreFile,
+		datamanager.WithLogger(log),
+		datamanager.WithStoreInterval(time.Duration(cfg.StoreInterval)*time.Second),
+	)
+
 	return &Server{
-		httpsrv:       srv,
 		log:           log,
+		httpsrv:       srv,
+		datamgr:       datamgr,
 		restoreOnBoot: cfg.RestoreOnBoot,
 		storage:       store,
 		storeInterval: time.Duration(cfg.StoreInterval) * time.Second,
@@ -88,74 +95,27 @@ func NewServer() (*Server, error) {
 }
 
 // Close closes the server.
-func (s *Server) Close() {
+func (s *Server) Close() error {
 	if err := s.storage.Close(); err != nil {
-		s.log.Error("storage.Close", zap.Error(err))
-	}
-}
-
-// LoadDataFromFile loads the metrics data from the file.
-func (s *Server) LoadDataFromFile() error {
-	dataLoader, err := datamanager.NewDataLoader(s.storeFile, s.storage)
-	if err != nil {
-		return fmt.Errorf("datamanager.NewDataManager: %w", err)
-	}
-	defer func() {
-		if err := dataLoader.Close(); err != nil {
-			s.log.Sugar().Errorf("dataLoader.Close: %v", err)
-		}
-	}()
-
-	s.log.Sugar().Infof("Loading data from file '%s'", dataLoader.GetFilename())
-
-	if err := dataLoader.Load(); err != nil {
-		return fmt.Errorf("dataLoader.Load: %w", err)
+		return fmt.Errorf("storage.Close: %w", err)
 	}
 
 	return nil
 }
 
-// SaveDataToFile saves the metrics data to the file.
-func (s *Server) SaveDataToFile(ctx context.Context, wg *sync.WaitGroup) error {
-	defer wg.Done()
-
-	dataSaver, err := datamanager.NewDataSaver(s.storeFile, s.storage)
-	if err != nil {
-		return fmt.Errorf("datamanager.NewDataSaver: %w", err)
-	}
+// Start starts the server.
+func (s *Server) Start() error {
 	defer func() {
-		if err := dataSaver.Close(); err != nil {
-			s.log.Sugar().Errorf("dataSaver.Close: %v", err)
+		if err := s.Close(); err != nil {
+			s.log.Error("failed to close server", zap.Error(err))
+
+			return
 		}
 	}()
 
-	storeTicker := time.NewTicker(s.storeInterval)
-	defer storeTicker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			if err := dataSaver.PurgeAndSave(); err != nil { //nolint:contextcheck
-				return fmt.Errorf("dataSaver.PurgeAndSave: %w", err)
-			}
-
-			return nil
-
-		case <-storeTicker.C:
-			if err := dataSaver.PurgeAndSave(); err != nil { //nolint:contextcheck
-				s.log.Sugar().Errorf("dataSaver.PurgeAndSave: %v", err)
-			}
-		}
-	}
-}
-
-// Start starts the server.
-func (s *Server) Start() error {
-	defer s.Close()
-
 	if s.restoreOnBoot {
-		if err := s.LoadDataFromFile(); err != nil {
-			return fmt.Errorf("server.LoadData: %w", err)
+		if err := s.datamgr.Load(context.Background()); err != nil {
+			return fmt.Errorf("failed to load data: %w", err)
 		}
 	}
 
@@ -169,11 +129,9 @@ func (s *Server) Start() error {
 	if s.storeFile != "" {
 		wg.Add(1)
 
-		s.log.Sugar().Infof("Saving data to file '%s' every %s", s.storeFile, s.storeInterval.String())
-
 		go func() {
-			if err := s.SaveDataToFile(ctx, wg); err != nil {
-				errChan <- fmt.Errorf("server.SaveData: %w", err)
+			if err := s.datamgr.RunDataSaver(ctx, wg); err != nil {
+				errChan <- fmt.Errorf("datamanager.RunDataSaver: %w", err)
 			}
 		}()
 	}
@@ -186,7 +144,7 @@ func (s *Server) Start() error {
 
 	// Graceful shutdown handler.
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	for {
 		select {
@@ -194,7 +152,14 @@ func (s *Server) Start() error {
 			return err
 
 		case <-quit:
-			s.log.Sugar().Infof("Gracefully shutting down server...")
+			s.log.Info("Gracefully shutting down server...")
+
+			httpSrvStopCtx, httpSrvStopCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer httpSrvStopCancel()
+
+			if err := s.httpsrv.Shutdown(httpSrvStopCtx); err != nil {
+				s.log.Error("server.Shutdown", zap.Error(err))
+			}
 
 			cancel()
 

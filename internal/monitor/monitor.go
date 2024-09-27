@@ -242,8 +242,9 @@ func (m *Monitor) RunCollector(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+
 		case <-pollTicker.C:
-			m.Collect()
+			m.collect()
 		}
 	}
 }
@@ -257,6 +258,7 @@ func (m *Monitor) RunCollectorGopsutils(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+
 		case <-pollTicker.C:
 			for _, v := range m.gopsutilstats {
 				v.Collect()
@@ -277,20 +279,49 @@ func (m *Monitor) RunReporter(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			m.log.Info("Stopping metrics reporter")
+			m.log.Info("Flushing metrics to remote server")
+
+			m.reportMetrics(append(m.metrics, m.gopsutilstats...))
+
 			return
+
 		case <-reportTicker.C:
-			m.ReportMetrics(append(m.metrics, m.gopsutilstats...))
+			m.reportMetrics(append(m.metrics, m.gopsutilstats...))
 		}
 	}
 }
 
 // Collect collects metrics.
-func (m *Monitor) Collect() {
+func (m *Monitor) collect() {
 	runtime.ReadMemStats(m.memstat)
 
 	for _, v := range m.metrics {
 		v.Collect()
 	}
+}
+
+// ReportMetrics pushes metrics to the remote server.
+func (m *Monitor) reportMetrics(metrics []Metric) {
+	metricsChan := make(chan Metric, m.rateLimit)
+
+	wg := &sync.WaitGroup{}
+
+	// Spawn workers
+	for w := 1; w <= m.rateLimit; w++ {
+		wg.Add(1)
+		go m.reportWorker(wg, metricsChan)
+	}
+
+	// Send metrics to the metrics channel
+	for _, v := range metrics {
+		metricsChan <- v
+	}
+
+	// Close channel and send signal to stop workers
+	close(metricsChan)
+
+	wg.Wait()
 }
 
 // reportWorker sends metrics to the remote server.
@@ -357,29 +388,6 @@ func (m *Monitor) reportWorker(wg *sync.WaitGroup, metricsChan <-chan Metric) {
 			m.log.Error("sendRequest: " + err.Error())
 		}
 	}
-}
-
-// ReportMetrics pushes metrics to the remote server.
-func (m *Monitor) ReportMetrics(metrics []Metric) {
-	metricsChan := make(chan Metric, m.rateLimit)
-
-	wg := &sync.WaitGroup{}
-
-	// Spawn workers
-	for w := 1; w <= m.rateLimit; w++ {
-		wg.Add(1)
-		go m.reportWorker(wg, metricsChan)
-	}
-
-	// Send metrics to the metrics channel
-	for _, v := range metrics {
-		metricsChan <- v
-	}
-
-	// Close channel and send signal to stop workers
-	close(metricsChan)
-
-	wg.Wait()
 }
 
 // Report pushes metrics to the remote server.
