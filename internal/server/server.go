@@ -4,7 +4,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -13,15 +12,18 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/andymarkow/go-metrics-collector/internal/cryptutils"
 	"github.com/andymarkow/go-metrics-collector/internal/datamanager"
 	"github.com/andymarkow/go-metrics-collector/internal/logger"
+	"github.com/andymarkow/go-metrics-collector/internal/server/httpserver"
+	"github.com/andymarkow/go-metrics-collector/internal/server/httpserver/router"
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
 )
 
 // Server represents a metrics server.
 type Server struct {
 	log           *zap.Logger
-	srv           *http.Server
+	httpsrv       *httpserver.HTTPServer
 	storage       storage.Storage
 	storeFile     string
 	storeInterval time.Duration
@@ -59,18 +61,24 @@ func NewServer() (*Server, error) {
 
 	store := storage.NewStorage(strg)
 
-	r := newRouter(store, WithLogger(log), WithSignKey([]byte(cfg.SignKey)))
-
-	srv := &http.Server{
-		Addr:              cfg.ServerAddr,
-		Handler:           r,
-		ReadTimeout:       60 * time.Second,
-		ReadHeaderTimeout: 10 * time.Second,
-		WriteTimeout:      60 * time.Second,
+	privateKey, err := cryptutils.LoadRSAPrivateKey(cfg.CryptoKey)
+	if err != nil {
+		return nil, fmt.Errorf("cryptutils.LoadRSAPrivateKey: %w", err)
 	}
 
+	r := router.NewRouter(store,
+		router.WithLogger(log),
+		router.WithSignKey([]byte(cfg.SignKey)),
+		router.WithCryptoPrivateKey(privateKey),
+	)
+
+	srv := httpserver.NewHTTPServer(r,
+		httpserver.WithServerAddr(cfg.ServerAddr),
+		httpserver.WithLogger(log),
+	)
+
 	return &Server{
-		srv:           srv,
+		httpsrv:       srv,
 		log:           log,
 		restoreOnBoot: cfg.RestoreOnBoot,
 		storage:       store,
@@ -171,10 +179,8 @@ func (s *Server) Start() error {
 	}
 
 	go func() {
-		s.log.Sugar().Infof("Starting server on '%s'", s.srv.Addr)
-
-		if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			errChan <- fmt.Errorf("server.ListenAndServe: %w", err)
+		if err := s.httpsrv.Start(); err != nil {
+			errChan <- fmt.Errorf("server.Start: %w", err)
 		}
 	}()
 
