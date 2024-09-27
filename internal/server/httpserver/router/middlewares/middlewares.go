@@ -3,6 +3,7 @@ package middlewares
 
 import (
 	"crypto/rsa"
+	"net"
 
 	"go.uber.org/zap"
 )
@@ -11,6 +12,7 @@ import (
 type Middlewares struct {
 	log           *zap.Logger
 	cryptoPrivKey *rsa.PrivateKey
+	trustedSubnet *net.IPNet
 	signKey       []byte
 }
 
@@ -46,8 +48,16 @@ func WithSignKey(signKey []byte) Option {
 	}
 }
 
+// WithCryptoPrivateKey is a router middleware option that sets decryption RSA private key.
 func WithCryptoPrivateKey(key *rsa.PrivateKey) Option {
 	return func(m *Middlewares) {
 		m.cryptoPrivKey = key
+	}
+}
+
+// WithTrustedSubnet is a router middleware option that sets trusted subnet as a whitelist.
+func WithTrustedSubnet(subnet *net.IPNet) Option {
+	return func(m *Middlewares) {
+		m.trustedSubnet = subnet
 	}
 }

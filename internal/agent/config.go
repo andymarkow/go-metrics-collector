@@ -71,8 +71,6 @@ func readConfigFile(file string, cfg *config) error {
 
 	if cfg.CryptoKey == "" {
 		if fileCfg.CryptoKey == "" {
-			cfg.CryptoKey = "./tls/public.key"
-		} else {
 			cfg.CryptoKey = fileCfg.CryptoKey
 		}
 	}

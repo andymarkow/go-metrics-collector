@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"runtime"
 	"sync"
 	"syscall"
@@ -241,6 +242,8 @@ func (m *Monitor) RunCollector(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			m.log.Info("Stopping metrics collector")
+
 			return
 
 		case <-pollTicker.C:
@@ -257,6 +260,8 @@ func (m *Monitor) RunCollectorGopsutils(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			m.log.Info("Stopping gopsutil metrics collector")
+
 			return
 
 		case <-pollTicker.C:
@@ -470,30 +475,47 @@ func (m *Monitor) sendRequest(metrics []models.Metrics) error {
 		m.client.SetHeader("HashSHA256", hex.EncodeToString(sign))
 	}
 
-	// Encrypt payload data with a public RSA key.
-	cryptoHash := sha256.New()
+	// If crypto public key is set, encrypt payload data with a public RSA key.
+	if m.cryptoPubKey != nil {
+		// Encrypt payload data with a public RSA key.
+		cryptoHash := sha256.New()
 
-	encryptedBody, err := cryptutils.EncryptOAEP(cryptoHash, rand.Reader, m.cryptoPubKey, payload, nil)
-	if err != nil {
-		return fmt.Errorf("cryptutils.EncryptOAEP: %w", err)
+		// Encrypt payload data with a public RSA key.
+		encryptedBody, err := cryptutils.EncryptOAEP(cryptoHash, rand.Reader, m.cryptoPubKey, payload, nil)
+		if err != nil {
+			return fmt.Errorf("cryptutils.EncryptOAEP: %w", err)
+		}
+
+		m.log.Debug("encrypted payload content", zap.Any("data", encryptedBody))
+
+		// Set encrypted payload data to the request body.
+		payload = encryptedBody
 	}
 
-	m.log.Debug("encrypted payload content", zap.Any("data", encryptedBody))
-
 	// Compress payload data with gzip compression method.
-	body, err := compressDataGzip(encryptedBody)
+	body, err := compressDataGzip(payload)
 	if err != nil {
 		return fmt.Errorf("failed to compress payload data with gzip: %w", err)
 	}
 
+	ip, err := getIPAddress()
+	if err != nil {
+		return fmt.Errorf("failed to get IP address: %w", err)
+	}
+
 	// Send payload data to the remote server.
-	_, err = m.client.R().
+	resp, err := m.client.R().
+		SetHeader("X-Real-IP", ip.String()).
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Content-Encoding", "gzip").
 		SetBody(body).
 		Post("/updates")
 	if err != nil {
 		return fmt.Errorf("client.Request: %w", err)
+	}
+
+	if resp.StatusCode() != http.StatusOK {
+		return fmt.Errorf("failed to send data: %d - %s", resp.StatusCode(), resp.String())
 	}
 
 	return nil
@@ -556,4 +578,25 @@ func compressDataGzip(data []byte) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+func getIPAddress() (net.IP, error) {
+	// Get a addresses list of all network interfaces.
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, fmt.Errorf("net.InterfaceAddrs: %w", err)
+	}
+
+	for _, addr := range addrs {
+		// Get the IP address network.
+		ipNet, ok := addr.(*net.IPNet)
+		// If the IP address is IPv4 and not a loopback address.
+		if ok && ipNet.IP.To4() != nil && !ipNet.IP.IsLoopback() {
+			// Return first valid non-loopback IPv4 address.
+			return ipNet.IP, nil
+		}
+	}
+
+	// If no valid non-loopback IPv4 address is found, return 127.0.0.1.
+	return net.IPv4(127, 0, 0, 1), nil
 }

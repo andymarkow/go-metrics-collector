@@ -13,6 +13,13 @@ import (
 	"github.com/andymarkow/go-metrics-collector/internal/cryptutils"
 )
 
+// Cryptography is a router middleware that decrypts the request body using RSA-OAEP decryption.
+//
+// The middleware expects the request body to be encrypted using the public key of the server.
+// The middleware decrypts the body using the private key of the server and updates the request body
+// with the decrypted data.
+//
+// If the decryption fails, the middleware returns a 500 status code.
 func (m *Middlewares) Cryptography(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)

@@ -29,6 +29,14 @@ func (m *Middlewares) HashSumValidator(next http.Handler) http.Handler {
 
 			return
 		}
+		defer func() {
+			if err := r.Body.Close(); err != nil {
+				m.log.Error("failed to close request body", zap.Error(err))
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+
+				return
+			}
+		}()
 
 		r.Body = io.NopCloser(bytes.NewBuffer(body))
 

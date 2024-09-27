@@ -3,6 +3,7 @@ package agent
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
 	"os"
 	"os/signal"
@@ -38,9 +39,15 @@ func NewAgent() (*Agent, error) {
 		return nil, fmt.Errorf("logger.NewZapLogger: %w", err)
 	}
 
-	publicKey, err := cryptutils.LoadRSAPublicKey(cfg.CryptoKey)
-	if err != nil {
-		return nil, fmt.Errorf("cryptutils.LoadRSAPublicKey: %w", err)
+	var publicKey *rsa.PublicKey
+
+	if cfg.CryptoKey != "" {
+		log.Info("Loading crypto key " + cfg.CryptoKey)
+
+		publicKey, err = cryptutils.LoadRSAPublicKey(cfg.CryptoKey)
+		if err != nil {
+			return nil, fmt.Errorf("cryptutils.LoadRSAPublicKey: %w", err)
+		}
 	}
 
 	mon := monitor.NewMonitor(
