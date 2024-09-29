@@ -475,13 +475,19 @@ func (m *Monitor) sendRequest(metrics []models.Metrics) error {
 		m.client.SetHeader("HashSHA256", hex.EncodeToString(sign))
 	}
 
+	// Compress payload data with gzip compression method.
+	body, err := compressDataGzip(payload)
+	if err != nil {
+		return fmt.Errorf("failed to compress payload data with gzip: %w", err)
+	}
+
 	// If crypto public key is set, encrypt payload data with a public RSA key.
 	if m.cryptoPubKey != nil {
 		// Encrypt payload data with a public RSA key.
 		cryptoHash := sha256.New()
 
 		// Encrypt payload data with a public RSA key.
-		encryptedBody, err := cryptutils.EncryptOAEP(cryptoHash, rand.Reader, m.cryptoPubKey, payload, nil)
+		encryptedBody, err := cryptutils.EncryptOAEP(cryptoHash, rand.Reader, m.cryptoPubKey, body, nil)
 		if err != nil {
 			return fmt.Errorf("cryptutils.EncryptOAEP: %w", err)
 		}
@@ -489,13 +495,7 @@ func (m *Monitor) sendRequest(metrics []models.Metrics) error {
 		m.log.Debug("encrypted payload content", zap.Any("data", encryptedBody))
 
 		// Set encrypted payload data to the request body.
-		payload = encryptedBody
-	}
-
-	// Compress payload data with gzip compression method.
-	body, err := compressDataGzip(payload)
-	if err != nil {
-		return fmt.Errorf("failed to compress payload data with gzip: %w", err)
+		body = encryptedBody
 	}
 
 	ip, err := getIPAddress()

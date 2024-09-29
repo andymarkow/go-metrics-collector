@@ -77,11 +77,11 @@ func NewRouter(store storage.Storage, opts ...Option) *chi.Mux {
 	})
 
 	r.Group(func(r chi.Router) {
-		r.Use(mw.Compress)
-
 		if rOpts.cryptoPrivKey != nil {
 			r.Use(mw.Cryptography)
 		}
+
+		r.Use(mw.Compress)
 
 		if useHashSumValidator {
 			r.Use(mw.HashSumValidator)
