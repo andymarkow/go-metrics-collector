@@ -19,6 +19,7 @@ type config struct {
 	DatabaseDSN   string `env:"DATABASE_DSN" json:"database_dsn"`
 	SignKey       string `env:"KEY" json:"sign_key"`
 	CryptoKey     string `env:"CRYPTO_KEY" json:"crypto_key"`
+	TrustedSubnet string `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
 	StoreFile     string `env:"FILE_STORAGE_PATH" json:"store_file"`
 	StoreInterval int    `env:"STORE_INTERVAL" json:"store_interval"`
 	RestoreOnBoot bool   `env:"RESTORE" json:"restore"`
@@ -41,6 +42,7 @@ func newConfig() (config, error) {
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "database connection string [env:DATABASE_DSN]")
 	flag.StringVar(&cfg.SignKey, "k", "", "signing key [env:KEY]")
 	flag.StringVar(&cfg.CryptoKey, "crypto-key", "", "path to RSA private key file to decrypt messages from Agent [env:CRYPTO_KEY]")
+	flag.StringVar(&cfg.TrustedSubnet, "t", "", "trusted subnet [env:TRUSTED_SUBNET]")
 	flag.StringVar(&cfg.StoreFile, "f", "", "filepath to store metrics data to [env:FILE_STORAGE_PATH]")
 	flag.IntVar(&cfg.StoreInterval, "i", 0, "interval in seconds to store metrics data into file [env:STORE_INTERVAL]")
 	flag.BoolVar(&cfg.RestoreOnBoot, "r", false, "whether or not to restore metrics data from file [env:RESTORE]")
@@ -73,8 +75,6 @@ func readConfigFile(file string, cfg *config) error {
 
 	if cfg.CryptoKey == "" {
 		if fileCfg.CryptoKey == "" {
-			cfg.CryptoKey = "./tls/private.key"
-		} else {
 			cfg.CryptoKey = fileCfg.CryptoKey
 		}
 	}
@@ -101,6 +101,10 @@ func readConfigFile(file string, cfg *config) error {
 
 	if cfg.SignKey == "" {
 		cfg.SignKey = fileCfg.SignKey
+	}
+
+	if cfg.TrustedSubnet == "" {
+		cfg.TrustedSubnet = fileCfg.TrustedSubnet
 	}
 
 	if cfg.StoreFile == "" {

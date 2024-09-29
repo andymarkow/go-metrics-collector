@@ -3,6 +3,7 @@ package router
 
 import (
 	"crypto/rsa"
+	"net"
 	_ "net/http/pprof" //nolint:gosec // Enable pprof debugger
 
 	"github.com/go-chi/chi/v5"
@@ -16,18 +17,19 @@ import (
 
 type routerOpts struct {
 	logger        *zap.Logger
+	trustedSubnet *net.IPNet
 	cryptoPrivKey *rsa.PrivateKey
 	signKey       []byte
 }
 
 func NewRouter(store storage.Storage, opts ...Option) *chi.Mux {
-	rOpts := routerOpts{
+	rOpts := &routerOpts{
 		logger:  zap.NewNop(),
 		signKey: make([]byte, 0),
 	}
 
 	for _, opt := range opts {
-		opt(&rOpts)
+		opt(rOpts)
 	}
 
 	h := handlers.NewHandlers(store, handlers.WithLogger(rOpts.logger))
@@ -38,12 +40,14 @@ func NewRouter(store storage.Storage, opts ...Option) *chi.Mux {
 		middlewares.WithLogger(rOpts.logger),
 		middlewares.WithSignKey(rOpts.signKey),
 		middlewares.WithCryptoPrivateKey(rOpts.cryptoPrivKey),
+		middlewares.WithTrustedSubnet(rOpts.trustedSubnet),
 	)
 
 	r.Use(
 		middleware.Recoverer,
 		middleware.StripSlashes,
 		mw.Logger,
+		mw.Whitelist,
 	)
 
 	var useHashSumValidator bool
@@ -73,8 +77,11 @@ func NewRouter(store storage.Storage, opts ...Option) *chi.Mux {
 	})
 
 	r.Group(func(r chi.Router) {
+		if rOpts.cryptoPrivKey != nil {
+			r.Use(mw.Cryptography)
+		}
+
 		r.Use(mw.Compress)
-		r.Use(mw.Cryptography)
 
 		if useHashSumValidator {
 			r.Use(mw.HashSumValidator)
@@ -107,5 +114,12 @@ func WithSignKey(signKey []byte) Option {
 func WithCryptoPrivateKey(key *rsa.PrivateKey) Option {
 	return func(o *routerOpts) {
 		o.cryptoPrivKey = key
+	}
+}
+
+// WithTrustedSubnet is a router option that sets trusted subnet.
+func WithTrustedSubnet(subnet *net.IPNet) Option {
+	return func(o *routerOpts) {
+		o.trustedSubnet = subnet
 	}
 }

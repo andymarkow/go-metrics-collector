@@ -3,7 +3,9 @@ package server
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"sync"
@@ -62,15 +64,32 @@ func NewServer() (*Server, error) {
 
 	store := storage.NewStorage(strg)
 
-	privateKey, err := cryptutils.LoadRSAPrivateKey(cfg.CryptoKey)
-	if err != nil {
-		return nil, fmt.Errorf("cryptutils.LoadRSAPrivateKey: %w", err)
+	var privateKey *rsa.PrivateKey
+
+	if cfg.CryptoKey != "" {
+		log.Info("Loading crypto key " + cfg.CryptoKey)
+
+		privateKey, err = cryptutils.LoadRSAPrivateKey(cfg.CryptoKey)
+		if err != nil {
+			return nil, fmt.Errorf("cryptutils.LoadRSAPrivateKey: %w", err)
+		}
+	}
+
+	var subnet *net.IPNet
+
+	if cfg.TrustedSubnet != "" {
+		var err error
+		_, subnet, err = net.ParseCIDR(cfg.TrustedSubnet)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse trusted subnet: %w", err)
+		}
 	}
 
 	r := router.NewRouter(store,
-		router.WithCryptoPrivateKey(privateKey),
 		router.WithLogger(log),
 		router.WithSignKey([]byte(cfg.SignKey)),
+		router.WithCryptoPrivateKey(privateKey),
+		router.WithTrustedSubnet(subnet),
 	)
 
 	srv := httpserver.NewHTTPServer(r,
