@@ -13,9 +13,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/andymarkow/go-metrics-collector/internal/cryptutils"
 	"github.com/andymarkow/go-metrics-collector/internal/logger"
 	"github.com/andymarkow/go-metrics-collector/internal/monitor"
+	"github.com/andymarkow/go-metrics-collector/internal/tlsutils"
 )
 
 // Agent represents a metrics agent that collects and reports metrics.
@@ -44,9 +44,9 @@ func NewAgent() (*Agent, error) {
 	if cfg.CryptoKey != "" {
 		log.Info("Loading crypto key " + cfg.CryptoKey)
 
-		publicKey, err = cryptutils.LoadRSAPublicKey(cfg.CryptoKey)
+		publicKey, err = tlsutils.LoadRSAPublicKey(cfg.CryptoKey)
 		if err != nil {
-			return nil, fmt.Errorf("cryptutils.LoadRSAPublicKey: %w", err)
+			return nil, fmt.Errorf("tlsutils.LoadRSAPublicKey: %w", err)
 		}
 	}
 
@@ -84,21 +84,7 @@ func (a *Agent) Start() error {
 	go func(wg *sync.WaitGroup) {
 		defer wg.Done()
 
-		a.monitor.RunCollector(ctx)
-	}(wg)
-
-	wg.Add(1)
-	go func(wg *sync.WaitGroup) {
-		defer wg.Done()
-
-		a.monitor.RunCollectorGopsutils(ctx)
-	}(wg)
-
-	wg.Add(1)
-	go func(wg *sync.WaitGroup) {
-		defer wg.Done()
-
-		a.monitor.RunReporter(ctx)
+		a.monitor.Run(ctx)
 	}(wg)
 
 	// Graceful shutdown by OS signals.

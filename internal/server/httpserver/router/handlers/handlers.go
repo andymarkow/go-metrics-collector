@@ -16,7 +16,7 @@ import (
 
 	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
 	"github.com/andymarkow/go-metrics-collector/internal/models"
-	"github.com/andymarkow/go-metrics-collector/internal/monitor"
+	"github.com/andymarkow/go-metrics-collector/internal/monitor/metrics"
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
 )
 
@@ -97,7 +97,7 @@ func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 	var metricValue string
 
 	switch metricType {
-	case string(monitor.MetricCounter):
+	case string(metrics.MetricCounter):
 		val, err := h.storage.GetCounter(ctx, metricName)
 		if errors.Is(err, storage.ErrMetricNotFound) {
 			h.handleError(w, err, http.StatusNotFound)
@@ -111,7 +111,7 @@ func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 
 		metricValue = fmt.Sprintf("%d", val)
 
-	case string(monitor.MetricGauge):
+	case string(metrics.MetricGauge):
 		val, err := h.storage.GetGauge(ctx, metricName)
 		if errors.Is(err, storage.ErrMetricNotFound) {
 			h.handleError(w, err, http.StatusNotFound)
@@ -160,13 +160,13 @@ func (h *Handlers) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "metricType")
 
 	switch metricType {
-	case string(monitor.MetricCounter):
+	case string(metrics.MetricCounter):
 		if err := h.storage.SetCounter(ctx, metricName, int64(metricValue)); err != nil {
 			h.handleError(w, err, http.StatusInternalServerError)
 
 			return
 		}
-	case string(monitor.MetricGauge):
+	case string(metrics.MetricGauge):
 		if err := h.storage.SetGauge(ctx, metricName, metricValue); err != nil {
 			h.handleError(w, err, http.StatusInternalServerError)
 
@@ -208,7 +208,7 @@ func (h *Handlers) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch metricPayload.MType {
-	case string(monitor.MetricCounter):
+	case string(metrics.MetricCounter):
 		val, err := h.storage.GetCounter(ctx, metricPayload.ID)
 		if errors.Is(err, storage.ErrMetricNotFound) {
 			h.handleError(w, err, http.StatusNotFound)
@@ -226,7 +226,7 @@ func (h *Handlers) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 			Delta: &val,
 		}
 
-	case string(monitor.MetricGauge):
+	case string(metrics.MetricGauge):
 		val, err := h.storage.GetGauge(ctx, metricPayload.ID)
 		if errors.Is(err, storage.ErrMetricNotFound) {
 			h.handleError(w, err, http.StatusNotFound)
@@ -284,7 +284,7 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch metricPayload.MType {
-	case string(monitor.MetricCounter):
+	case string(metrics.MetricCounter):
 		if err := h.storage.SetCounter(ctx, metricPayload.ID, *metricPayload.Delta); err != nil {
 			h.handleError(w, err, http.StatusInternalServerError)
 
@@ -304,7 +304,7 @@ func (h *Handlers) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 			Delta: &val,
 		}
 
-	case string(monitor.MetricGauge):
+	case string(metrics.MetricGauge):
 		if err := h.storage.SetGauge(ctx, metricPayload.ID, *metricPayload.Value); err != nil {
 			h.handleError(w, err, http.StatusInternalServerError)
 

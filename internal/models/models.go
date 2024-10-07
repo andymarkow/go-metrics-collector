@@ -3,6 +3,7 @@ package models
 
 import (
 	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
+	"github.com/andymarkow/go-metrics-collector/internal/monitor/metrics"
 )
 
 // Metrics is a model for metrics.
@@ -23,7 +24,7 @@ func (m *Metrics) Validate() error {
 	}
 
 	switch m.MType {
-	case "counter", "gauge":
+	case string(metrics.MetricCounter), string(metrics.MetricGauge):
 	default:
 		return errormsg.ErrMetricInvalidType
 	}
@@ -41,12 +42,12 @@ func (m *Metrics) ValidateUpdate() error {
 	}
 
 	switch m.MType {
-	case "counter":
+	case string(metrics.MetricCounter):
 		if m.Delta == nil {
 			return errormsg.ErrMetricEmptyDelta
 		}
 
-	case "gauge":
+	case string(metrics.MetricGauge):
 		if m.Value == nil {
 			return errormsg.ErrMetricEmptyValue
 		}
@@ -56,4 +57,30 @@ func (m *Metrics) ValidateUpdate() error {
 	}
 
 	return nil
+}
+
+func NewMetrics(id, mType string, delta *int64, value *float64) (Metrics, error) {
+	if id == "" {
+		return Metrics{}, errormsg.ErrMetricEmptyName
+	}
+
+	switch mType {
+	case string(metrics.MetricCounter):
+		if delta == nil {
+			return Metrics{}, errormsg.ErrMetricEmptyDelta
+		}
+	case string(metrics.MetricGauge):
+		if value == nil {
+			return Metrics{}, errormsg.ErrMetricEmptyValue
+		}
+	default:
+		return Metrics{}, errormsg.ErrMetricInvalidType
+	}
+
+	return Metrics{
+		ID:    id,
+		MType: mType,
+		Delta: delta,
+		Value: value,
+	}, nil
 }

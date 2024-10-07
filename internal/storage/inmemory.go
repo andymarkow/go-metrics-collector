@@ -7,14 +7,14 @@ import (
 	"sync"
 
 	"github.com/andymarkow/go-metrics-collector/internal/models"
-	"github.com/andymarkow/go-metrics-collector/internal/monitor"
+	"github.com/andymarkow/go-metrics-collector/internal/monitor/metrics"
 )
 
 var _ Storage = (*MemStorage)(nil)
 
 type Metric struct {
 	Value any                `json:"value"`
-	Type  monitor.MetricType `json:"type"`
+	Type  metrics.MetricType `json:"type"`
 }
 
 func (m *Metric) StringValue() string {
@@ -88,7 +88,7 @@ func (s *MemStorage) SetCounter(_ context.Context, name string, value int64) err
 	if metric, ok := s.data[name]; ok {
 		if v, ok := metric.Value.(CounterValue); ok {
 			s.data[name] = Metric{
-				Type:  monitor.MetricCounter,
+				Type:  metrics.MetricCounter,
 				Value: CounterValue(int64(v) + value),
 			}
 
@@ -99,7 +99,7 @@ func (s *MemStorage) SetCounter(_ context.Context, name string, value int64) err
 	}
 
 	s.data[name] = Metric{
-		Type:  monitor.MetricCounter,
+		Type:  metrics.MetricCounter,
 		Value: CounterValue(value),
 	}
 
@@ -132,7 +132,7 @@ func (s *MemStorage) SetGauge(_ context.Context, name string, value float64) err
 	}
 
 	s.data[name] = Metric{
-		Type:  monitor.MetricGauge,
+		Type:  metrics.MetricGauge,
 		Value: GaugeValue(value),
 	}
 
@@ -163,7 +163,7 @@ func (s *MemStorage) LoadData(_ context.Context, data map[string]Metric) error {
 
 	for k, metric := range data {
 		switch metric.Type {
-		case monitor.MetricCounter:
+		case metrics.MetricCounter:
 			v, ok := metric.Value.(float64)
 			if !ok {
 				return fmt.Errorf("failed load metric (%s): invalid value type (%T)", k, metric.Value)
@@ -174,7 +174,7 @@ func (s *MemStorage) LoadData(_ context.Context, data map[string]Metric) error {
 				Value: CounterValue(int64(v)),
 			}
 
-		case monitor.MetricGauge:
+		case metrics.MetricGauge:
 			v, ok := metric.Value.(float64)
 			if !ok {
 				return fmt.Errorf("failed load metric (%s): invalid value type (%T)", k, metric.Value)
