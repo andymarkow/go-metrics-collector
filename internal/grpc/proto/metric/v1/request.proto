@@ -6,6 +6,6 @@ package collector.metric.v1;
 
 import "payload.proto";
 
-message UpdateMetricRequest {
+message UpdateMetricsRequest {
     Payload payload = 1;
 }

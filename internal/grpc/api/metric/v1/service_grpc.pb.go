@@ -20,14 +20,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	MetricService_UpdateMetric_FullMethodName = "/collector.metric.v1.MetricService/UpdateMetric"
+	MetricService_UpdateMetrics_FullMethodName = "/collector.metric.v1.MetricService/UpdateMetrics"
 )
 
 // MetricServiceClient is the client API for MetricService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type MetricServiceClient interface {
-	UpdateMetric(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UpdateMetricRequest, UpdateMetricResponse], error)
+	UpdateMetrics(ctx context.Context, in *UpdateMetricsRequest, opts ...grpc.CallOption) (*UpdateMetricsResponse, error)
 }
 
 type metricServiceClient struct {
@@ -38,24 +38,21 @@ func NewMetricServiceClient(cc grpc.ClientConnInterface) MetricServiceClient {
 	return &metricServiceClient{cc}
 }
 
-func (c *metricServiceClient) UpdateMetric(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UpdateMetricRequest, UpdateMetricResponse], error) {
+func (c *metricServiceClient) UpdateMetrics(ctx context.Context, in *UpdateMetricsRequest, opts ...grpc.CallOption) (*UpdateMetricsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &MetricService_ServiceDesc.Streams[0], MetricService_UpdateMetric_FullMethodName, cOpts...)
+	out := new(UpdateMetricsResponse)
+	err := c.cc.Invoke(ctx, MetricService_UpdateMetrics_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[UpdateMetricRequest, UpdateMetricResponse]{ClientStream: stream}
-	return x, nil
+	return out, nil
 }
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type MetricService_UpdateMetricClient = grpc.ClientStreamingClient[UpdateMetricRequest, UpdateMetricResponse]
 
 // MetricServiceServer is the server API for MetricService service.
 // All implementations must embed UnimplementedMetricServiceServer
 // for forward compatibility.
 type MetricServiceServer interface {
-	UpdateMetric(grpc.ClientStreamingServer[UpdateMetricRequest, UpdateMetricResponse]) error
+	UpdateMetrics(context.Context, *UpdateMetricsRequest) (*UpdateMetricsResponse, error)
 	mustEmbedUnimplementedMetricServiceServer()
 }
 
@@ -66,8 +63,8 @@ type MetricServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedMetricServiceServer struct{}
 
-func (UnimplementedMetricServiceServer) UpdateMetric(grpc.ClientStreamingServer[UpdateMetricRequest, UpdateMetricResponse]) error {
-	return status.Errorf(codes.Unimplemented, "method UpdateMetric not implemented")
+func (UnimplementedMetricServiceServer) UpdateMetrics(context.Context, *UpdateMetricsRequest) (*UpdateMetricsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateMetrics not implemented")
 }
 func (UnimplementedMetricServiceServer) mustEmbedUnimplementedMetricServiceServer() {}
 func (UnimplementedMetricServiceServer) testEmbeddedByValue()                       {}
@@ -90,12 +87,23 @@ func RegisterMetricServiceServer(s grpc.ServiceRegistrar, srv MetricServiceServe
 	s.RegisterService(&MetricService_ServiceDesc, srv)
 }
 
-func _MetricService_UpdateMetric_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(MetricServiceServer).UpdateMetric(&grpc.GenericServerStream[UpdateMetricRequest, UpdateMetricResponse]{ServerStream: stream})
+func _MetricService_UpdateMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateMetricsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MetricServiceServer).UpdateMetrics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MetricService_UpdateMetrics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MetricServiceServer).UpdateMetrics(ctx, req.(*UpdateMetricsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type MetricService_UpdateMetricServer = grpc.ClientStreamingServer[UpdateMetricRequest, UpdateMetricResponse]
 
 // MetricService_ServiceDesc is the grpc.ServiceDesc for MetricService service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -103,13 +111,12 @@ type MetricService_UpdateMetricServer = grpc.ClientStreamingServer[UpdateMetricR
 var MetricService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "collector.metric.v1.MetricService",
 	HandlerType: (*MetricServiceServer)(nil),
-	Methods:     []grpc.MethodDesc{},
-	Streams: []grpc.StreamDesc{
+	Methods: []grpc.MethodDesc{
 		{
-			StreamName:    "UpdateMetric",
-			Handler:       _MetricService_UpdateMetric_Handler,
-			ClientStreams: true,
+			MethodName: "UpdateMetrics",
+			Handler:    _MetricService_UpdateMetrics_Handler,
 		},
 	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "service.proto",
 }

@@ -157,7 +157,6 @@ jobs:
 
       - name: "Code increment #5"
         if: |
-          github.head_ref == 'iter25' ||
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter5' ||
           github.head_ref == 'iter6' ||

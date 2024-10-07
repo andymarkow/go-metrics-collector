@@ -1,82 +1,43 @@
 package v1
 
 import (
-	"errors"
+	"context"
 	"fmt"
-	"io"
 
-	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	pbv1 "github.com/andymarkow/go-metrics-collector/internal/grpc/api/metric/v1"
 	"github.com/andymarkow/go-metrics-collector/internal/models"
 )
 
-func (s *MetricService) UpdateMetrics(stream pbv1.MetricService_UpdateMetricServer) error {
-	var metrics []models.Metrics
-	var batchSize = 100
+// UpdateMetrics handles a gRPC UpdateMetrics request.
+func (s *MetricService) UpdateMetrics(ctx context.Context, req *pbv1.UpdateMetricsRequest) (*pbv1.UpdateMetricsResponse, error) {
+	var response pbv1.UpdateMetricsResponse
 
-	for {
-		req, err := stream.Recv()
-		if errors.Is(err, io.EOF) {
-			err := stream.SendAndClose(&pbv1.UpdateMetricResponse{
-				Status: &pbv1.Status{
-					Status: &wrapperspb.StringValue{Value: "OK"},
-				},
-			})
-			if err != nil {
-				s.log.Error("stream.SendAndClose", zap.Error(err))
-			}
-
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("stream.Recv: %w", err)
-		}
-
-		// Process metric request.
-		metric, err := s.processUpdateMetricRequest(req)
-		if err != nil {
-			return fmt.Errorf("failed to process UpdateMetricRequest: %w", err)
-		}
-
-		metrics = append(metrics, metric)
-
-		// Check if batch size limit is reached.
-		if len(metrics) >= batchSize {
-			// Write metrics to the storage.
-			if err := s.storage.SetMetrics(stream.Context(), metrics); err != nil {
-				s.log.Error("failed to write metrics to storage", zap.Error(fmt.Errorf("storage.SetMetrics: %w", err)))
-
-				// Should continue to process in the next iteration.
-				// Metrics won't be flushed to the storage.
-				continue
-			}
-
-			// Flush already written to the storage metrics.
-			metrics = metrics[:0]
-		}
+	ms, err := s.processUpdateMetricRequest(req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to process request: %v", err)
 	}
 
-	// Check if there are any remaining metrics.
-	if len(metrics) > 0 {
-		// Write remaining metrics to the storage.
-		err := s.storage.SetMetrics(stream.Context(), metrics)
-		if err != nil {
-			return fmt.Errorf("storage.SetMetrics: %w", err)
-		}
+	if err := s.storage.SetMetrics(ctx, ms); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to write metrics to storage: %v", err)
 	}
 
-	return nil
+	response.Status = &pbv1.Status{Msg: &wrapperspb.StringValue{Value: "OK"}}
+
+	return &response, nil
 }
 
-func (s *MetricService) processUpdateMetricRequest(req *pbv1.UpdateMetricRequest) (models.Metrics, error) {
+// processUpdateMetricRequest processes a gRPC UpdateMetric request.
+func (s *MetricService) processUpdateMetricRequest(req *pbv1.UpdateMetricsRequest) ([]models.Metrics, error) {
 	data := req.GetPayload().GetData().GetValue()
 
-	metric, err := models.UnmarshalMetricsJSON(data)
+	metricBatch, err := models.UnmarshalMetricsJSON(data)
 	if err != nil {
-		return models.Metrics{}, fmt.Errorf("models.UnmarshalMetricsJSON: %w", err)
+		return nil, fmt.Errorf("models.UnmarshalMetricsJSON: %w", err)
 	}
 
-	return metric, nil
+	return metricBatch, nil
 }

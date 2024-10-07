@@ -88,22 +88,28 @@ func NewMetrics(id, mType string, delta *int64, value *float64) (Metrics, error)
 	}, nil
 }
 
-func UnmarshalMetricsJSON(data []byte) (Metrics, error) {
-	var metric Metrics
+func UnmarshalMetricsJSON(data []byte) ([]Metrics, error) {
+	var metricsBatch []Metrics
 
-	if err := json.Unmarshal(data, &metric); err != nil {
-		return Metrics{}, fmt.Errorf("json.Unmarshal: %w", err)
+	if err := json.Unmarshal(data, &metricsBatch); err != nil {
+		return nil, fmt.Errorf("json.Unmarshal: %w", err)
 	}
 
-	m, err := NewMetrics(
-		metric.ID,
-		metric.MType,
-		metric.Delta,
-		metric.Value,
-	)
-	if err != nil {
-		return Metrics{}, fmt.Errorf("models.NewMetrics: %w", err)
+	ms := make([]Metrics, 0, len(metricsBatch))
+
+	for _, metric := range metricsBatch {
+		m, err := NewMetrics(
+			metric.ID,
+			metric.MType,
+			metric.Delta,
+			metric.Value,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("models.NewMetrics: %w", err)
+		}
+
+		ms = append(ms, m)
 	}
 
-	return m, nil
+	return ms, nil
 }

@@ -12,6 +12,7 @@ STORE_INTERVAL=10
 FILE_STORAGE_PATH=./metrics-db.json
 KEY=secretkey
 # DATABASE_DSN=postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+USE_GRPC=true
 
 .PHONY: all
 all: fmt tidy test lint
@@ -31,7 +32,7 @@ run-server:
 
 .PHONY: run-agent
 run-agent:
-	go run ./cmd/agent
+	ADDRESS=localhost:50051 go run ./cmd/agent
 
 .PHONY: run-postgres
 run-postgres:

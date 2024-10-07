@@ -7,5 +7,5 @@ package collector.metric.v1;
 import "google/protobuf/wrappers.proto";
 
 message Status {
-    google.protobuf.StringValue status = 1;
+    google.protobuf.StringValue msg = 1;
 }

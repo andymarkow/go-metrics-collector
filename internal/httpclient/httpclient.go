@@ -4,6 +4,7 @@ package httpclient
 import (
 	"errors"
 	"net"
+	"strings"
 	"syscall"
 	"time"
 
@@ -38,6 +39,18 @@ type Option func(c *HTTPClient)
 func WithLogger(log *zap.Logger) Option {
 	return func(c *HTTPClient) {
 		c.SetLogger(log.Sugar())
+	}
+}
+
+func WithBaseURL(baseURL string) Option {
+	// Check if the URL does not start with "http://" or "https://".
+	if !strings.HasPrefix(baseURL, "http://") &&
+		!strings.HasPrefix(baseURL, "https://") {
+		baseURL = "http://" + baseURL
+	}
+
+	return func(c *HTTPClient) {
+		c.SetBaseURL(baseURL)
 	}
 }
 

@@ -58,6 +58,7 @@ func NewAgent() (*Agent, error) {
 		monitor.WithPollInterval(time.Duration(cfg.PollInterval)*time.Second),
 		monitor.WithReportInterval(time.Duration(cfg.ReportInterval)*time.Second),
 		monitor.WithRateLimit(cfg.RateLimit),
+		monitor.WithUseGrpc(cfg.UseGrpc),
 	)
 
 	return &Agent{

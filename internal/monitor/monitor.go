@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
 
 	"github.com/andymarkow/go-metrics-collector/internal/monitor/collector"
 	"github.com/andymarkow/go-metrics-collector/internal/monitor/metrics"
@@ -30,8 +31,8 @@ type config struct {
 	signKey        []byte
 	pollInterval   time.Duration
 	reportInterval time.Duration
-	rateLimit      int
 	serverAddr     string
+	rateLimit      int
 }
 
 // NewMonitor creates a new Monitor with the given options.
@@ -52,6 +53,8 @@ func NewMonitor(opts ...Option) *Monitor {
 
 	col.Register(getMetrics()...)
 
+	rateLimiter := rate.NewLimiter(rate.Every(time.Second), mon.cfg.rateLimit)
+
 	mon.collector = col
 
 	mon.reporter = reporter.NewMetricReporter(
@@ -59,7 +62,7 @@ func NewMonitor(opts ...Option) *Monitor {
 		reporter.WithServerAddr(mon.cfg.serverAddr),
 		reporter.WithSignKey(mon.cfg.signKey),
 		reporter.WithCryptoKey(mon.cfg.cryptoPubKey),
-		reporter.WithRateLimit(mon.cfg.rateLimit),
+		reporter.WithRateLimiter(rateLimiter),
 		reporter.WithUseGrpc(mon.cfg.useGrpc),
 	)
 

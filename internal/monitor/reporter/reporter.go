@@ -2,24 +2,18 @@
 package reporter
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
-	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"net"
-	"net/http"
 	"time"
 
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
-	"github.com/andymarkow/go-metrics-collector/internal/cryptutils"
-	"github.com/andymarkow/go-metrics-collector/internal/httpclient"
+	grpcclient "github.com/andymarkow/go-metrics-collector/internal/grpc/client/metric/v1"
+	"github.com/andymarkow/go-metrics-collector/internal/metricclient"
 	"github.com/andymarkow/go-metrics-collector/internal/models"
 	"github.com/andymarkow/go-metrics-collector/internal/monitor/metrics"
 	"github.com/andymarkow/go-metrics-collector/internal/signature"
@@ -27,43 +21,64 @@ import (
 
 // MetricReporter represents a metric reporter.
 type MetricReporter struct {
-	cfg         *config
-	log         *zap.Logger
-	httpClient  *httpclient.HTTPClient
-	metricsChan <-chan metrics.Metric
-	rateLimiter *rate.Limiter
+	cfg          *config
+	log          *zap.Logger
+	metricsChan  <-chan metrics.Metric
+	metricClient *metricclient.MetricClient
+	grpcClient   *grpcclient.Client
+	sendTimeout  time.Duration
+	useGrpc      bool
 }
 
 type config struct {
-	serverAddr string
-	useGrpc    bool
-	signKey    []byte
-	cryptoKey  *rsa.PublicKey
+	serverAddr  string
+	signKey     []byte
+	cryptoKey   *rsa.PublicKey
+	rateLimiter *rate.Limiter
 }
 
 // NewMetricReporter creates a new metric reporter.
 func NewMetricReporter(opts ...Option) *MetricReporter {
-	reporter := &MetricReporter{
+	rep := &MetricReporter{
 		log:         zap.NewNop(),
-		httpClient:  httpclient.NewHTTPClient(),
 		cfg:         defaultConfig(),
-		rateLimiter: rate.NewLimiter(rate.Every(time.Second), 10),
+		sendTimeout: 5 * time.Second,
 	}
 
 	for _, opt := range opts {
-		opt(reporter)
+		opt(rep)
 	}
 
-	reporter.httpClient.SetBaseURL(reporter.cfg.serverAddr)
+	if rep.useGrpc {
+		grpcClient, err := grpcclient.NewClient(
+			grpcclient.WithServerAddr(rep.cfg.serverAddr),
+			grpcclient.WithLogger(rep.log),
+			grpcclient.WithRateLimiter(rep.cfg.rateLimiter),
+		)
+		if err != nil {
+			rep.log.Error("grpcclient.NewClient", zap.Error(err))
+		}
 
-	return reporter
+		rep.grpcClient = grpcClient
+	} else {
+		metricClient := metricclient.NewMetricClient(
+			metricclient.WithServerAddr(rep.cfg.serverAddr),
+			metricclient.WithLogger(rep.log),
+			metricclient.WithRateLimiter(rep.cfg.rateLimiter),
+			metricclient.WithCryptoKey(rep.cfg.cryptoKey),
+		)
+
+		rep.metricClient = metricClient
+	}
+
+	return rep
 }
 
 // defaultConfig returns the default config for the metric reporter.
 func defaultConfig() *config {
 	return &config{
-		serverAddr: "localhost:8080",
-		useGrpc:    false,
+		serverAddr:  "localhost:8080",
+		rateLimiter: rate.NewLimiter(rate.Limit(10), 10),
 	}
 }
 
@@ -80,7 +95,7 @@ func WithLogger(logger *zap.Logger) Option {
 // WithUseGrpc sets the use grpc flag for the metric reporter.
 func WithUseGrpc(useGrpc bool) Option {
 	return func(r *MetricReporter) {
-		r.cfg.useGrpc = useGrpc
+		r.useGrpc = useGrpc
 	}
 }
 
@@ -98,10 +113,10 @@ func WithCryptoKey(cryptoKey *rsa.PublicKey) Option {
 	}
 }
 
-// WithRateLimit sets the rate limit for the metric reporter.
-func WithRateLimit(limit int) Option {
+// WithRateLimiter sets the rate limit for the metric reporter.
+func WithRateLimiter(limiter *rate.Limiter) Option {
 	return func(r *MetricReporter) {
-		r.rateLimiter = rate.NewLimiter(rate.Every(time.Second), limit)
+		r.cfg.rateLimiter = limiter
 	}
 }
 
@@ -109,6 +124,12 @@ func WithRateLimit(limit int) Option {
 func WithServerAddr(addr string) Option {
 	return func(r *MetricReporter) {
 		r.cfg.serverAddr = addr
+	}
+}
+
+func WithSendTimeout(timeout time.Duration) Option {
+	return func(r *MetricReporter) {
+		r.sendTimeout = timeout
 	}
 }
 
@@ -120,6 +141,7 @@ func (r *MetricReporter) RegisterSource(metricsChan <-chan metrics.Metric) {
 // Run starts the metric reporter.
 func (r *MetricReporter) Run() {
 	r.log.Info("Starting metric reporter")
+	r.log.Info("Reporting method", zap.Bool("grpc", r.useGrpc), zap.Bool("http", !r.useGrpc))
 
 	r.runConsumer()
 
@@ -128,7 +150,7 @@ func (r *MetricReporter) Run() {
 
 // runConsumer runs the metrics consumer.
 func (r *MetricReporter) runConsumer() {
-	const batchSize int = 50
+	const batchSize int = 10
 
 	r.log.Info("Starting metrics consumer")
 
@@ -193,12 +215,8 @@ func (r *MetricReporter) runConsumer() {
 
 // sendRequest sends a request to the server.
 func (r *MetricReporter) sendRequest(metrics []models.Metrics) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), r.sendTimeout)
 	defer cancel()
-
-	if err := r.rateLimiter.Wait(ctx); err != nil {
-		return fmt.Errorf("rateLimiter.Wait: %w", err)
-	}
 
 	payload, err := json.Marshal(metrics)
 	if err != nil {
@@ -219,9 +237,18 @@ func (r *MetricReporter) sendRequest(metrics []models.Metrics) error {
 		hashsum = hex.EncodeToString(sign)
 	}
 
-	// TODO: add grpc support
-	// if r.useGrpc {
-	// }
+	// Check if use grpc flag set to true.
+	if r.useGrpc {
+		r.log.Debug("sending metrics batch by grpc")
+
+		if err := r.sendByGRPC(ctx, payload); err != nil {
+			return fmt.Errorf("sendByGRPC: %w", err)
+		}
+
+		return nil
+	}
+
+	r.log.Debug("sending metrics batch by http")
 
 	if err := r.sendByHTTP(hashsum, payload); err != nil {
 		return fmt.Errorf("sendByHTTP: %w", err)
@@ -232,96 +259,21 @@ func (r *MetricReporter) sendRequest(metrics []models.Metrics) error {
 
 // sendByHTTP sends a request to the server by http.
 func (r *MetricReporter) sendByHTTP(hashsum string, payload []byte) error {
-	// Compress payload data with gzip compression method.
-	body, err := compressDataGzip(payload)
+	err := r.metricClient.UpdateMetrics(context.Background(), hashsum, payload)
 	if err != nil {
-		return fmt.Errorf("failed to compress payload data with gzip: %w", err)
-	}
-
-	// If crypto public key is set, encrypt payload data with a public RSA key.
-	if r.cfg.cryptoKey != nil {
-		// Encrypt payload data with a public RSA key.
-		cryptoHash := sha256.New()
-
-		// Encrypt payload data with a public RSA key.
-		encryptedBody, err := cryptutils.EncryptOAEP(cryptoHash, rand.Reader, r.cfg.cryptoKey, body, nil)
-		if err != nil {
-			return fmt.Errorf("cryptutils.EncryptOAEP: %w", err)
-		}
-
-		r.log.Debug("encrypted payload content", zap.Any("data", encryptedBody))
-
-		// Set encrypted payload data to the request body.
-		body = encryptedBody
-	}
-
-	ip, err := getIPAddress()
-	if err != nil {
-		return fmt.Errorf("failed to get IP address: %w", err)
-	}
-
-	req := r.httpClient.R().
-		SetHeader("X-Real-IP", ip.String()).
-		SetHeader("Content-Type", "application/json").
-		SetHeader("Content-Encoding", "gzip").
-		SetBody(body)
-
-	if hashsum != "" {
-		req.SetHeader("HashSHA256", hashsum)
-	}
-
-	// Send payload data to the remote server.
-	resp, err := req.Post("/updates")
-	if err != nil {
-		return fmt.Errorf("client.Request: %w", err)
-	}
-
-	if resp.StatusCode() != http.StatusOK {
-		return fmt.Errorf("failed to send data: %d - %s", resp.StatusCode(), resp.String())
+		return fmt.Errorf("metricClient.UpdateMetrics: %w", err)
 	}
 
 	return nil
 }
 
-// compressDataGzip compresses the given data using gzip.
-//
-// The function writes the given data to a gzip writer and then closes the writer.
-// If any error occurs while writing or closing, the function returns the error.
-//
-// If no error occurs, the function returns the compressed data as a byte slice.
-func compressDataGzip(data []byte) ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-
-	zbuf := gzip.NewWriter(buf)
-
-	if _, err := zbuf.Write(data); err != nil {
-		return nil, fmt.Errorf("zbuf.Write: %w", err)
-	}
-
-	if err := zbuf.Close(); err != nil {
-		return nil, fmt.Errorf("zbuf.Close: %w", err)
-	}
-
-	return buf.Bytes(), nil
-}
-
-func getIPAddress() (net.IP, error) {
-	// Get a addresses list of all network interfaces.
-	addrs, err := net.InterfaceAddrs()
+func (r *MetricReporter) sendByGRPC(ctx context.Context, payload []byte) error {
+	msg, err := r.grpcClient.UpdateMetricsV1(ctx, payload)
 	if err != nil {
-		return nil, fmt.Errorf("net.InterfaceAddrs: %w", err)
+		return fmt.Errorf("grpcClient.UpdateMetricsV1: %w", err)
 	}
 
-	for _, addr := range addrs {
-		// Get the IP address network.
-		ipNet, ok := addr.(*net.IPNet)
-		// If the IP address is IPv4 and not a loopback address.
-		if ok && ipNet.IP.To4() != nil && !ipNet.IP.IsLoopback() {
-			// Return first valid non-loopback IPv4 address.
-			return ipNet.IP, nil
-		}
-	}
+	r.log.Info("grpc response", zap.Any("status", msg))
 
-	// If no valid non-loopback IPv4 address is found, return 127.0.0.1.
-	return net.IPv4(127, 0, 0, 1), nil
+	return nil
 }

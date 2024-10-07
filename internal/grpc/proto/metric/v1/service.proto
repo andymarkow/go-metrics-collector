@@ -8,5 +8,5 @@ import "request.proto";
 import "response.proto";
 
 service MetricService {
-    rpc UpdateMetric (stream UpdateMetricRequest) returns (UpdateMetricResponse) {}
+    rpc UpdateMetrics (UpdateMetricsRequest) returns (UpdateMetricsResponse) {}
 }
