@@ -2,6 +2,9 @@
 package models
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
 	"github.com/andymarkow/go-metrics-collector/internal/monitor/metrics"
 )
@@ -83,4 +86,24 @@ func NewMetrics(id, mType string, delta *int64, value *float64) (Metrics, error)
 		Delta: delta,
 		Value: value,
 	}, nil
+}
+
+func UnmarshalMetricsJSON(data []byte) (Metrics, error) {
+	var metric Metrics
+
+	if err := json.Unmarshal(data, &metric); err != nil {
+		return Metrics{}, fmt.Errorf("json.Unmarshal: %w", err)
+	}
+
+	m, err := NewMetrics(
+		metric.ID,
+		metric.MType,
+		metric.Delta,
+		metric.Value,
+	)
+	if err != nil {
+		return Metrics{}, fmt.Errorf("models.NewMetrics: %w", err)
+	}
+
+	return m, nil
 }

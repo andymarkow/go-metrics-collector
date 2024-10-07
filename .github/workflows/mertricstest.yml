@@ -64,7 +64,6 @@ jobs:
 
       - name: "Code increment #1"
         if: |
-          github.head_ref == 'iter25' ||
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter1' ||
           github.head_ref == 'iter2' ||
@@ -112,7 +111,6 @@ jobs:
 
       - name: "Code increment #3"
         if: |
-          github.head_ref == 'iter25' ||
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter3' ||
           github.head_ref == 'iter4' ||

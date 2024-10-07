@@ -71,17 +71,11 @@ func (s *MetricService) UpdateMetrics(stream pbv1.MetricService_UpdateMetricServ
 }
 
 func (s *MetricService) processUpdateMetricRequest(req *pbv1.UpdateMetricRequest) (models.Metrics, error) {
-	delta := req.GetDelta().GetDelta().GetValue()
-	value := req.GetValue().GetValue().GetValue()
+	data := req.GetPayload().GetData().GetValue()
 
-	metric, err := models.NewMetrics(
-		req.GetId().GetId().GetValue(),
-		req.GetMtype().GetMtype().String(),
-		&delta,
-		&value,
-	)
+	metric, err := models.UnmarshalMetricsJSON(data)
 	if err != nil {
-		return models.Metrics{}, fmt.Errorf("models.NewMetrics: %w", err)
+		return models.Metrics{}, fmt.Errorf("models.UnmarshalMetricsJSON: %w", err)
 	}
 
 	return metric, nil

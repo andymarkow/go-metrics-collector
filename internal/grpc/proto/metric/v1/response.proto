@@ -4,7 +4,7 @@ option go_package = "github.com/andymarkow/go-metrics-collector/internal/grpc/ap
 
 package collector.metric.v1;
 
-import "metric_status.proto";
+import "status.proto";
 
 message UpdateMetricResponse {
     Status status = 1;

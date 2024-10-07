@@ -4,8 +4,8 @@ option go_package = "github.com/andymarkow/go-metrics-collector/internal/grpc/ap
 
 package collector.metric.v1;
 
-import "google/protobuf/wrappers.proto";
+import "payload.proto";
 
-message Delta {
-    google.protobuf.Int64Value delta = 1;
+message UpdateMetricRequest {
+    Payload payload = 1;
 }

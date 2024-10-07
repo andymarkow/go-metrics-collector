@@ -6,6 +6,6 @@ package collector.metric.v1;
 
 import "google/protobuf/wrappers.proto";
 
-message Id {
-    google.protobuf.StringValue id = 1;
+message Payload {
+    google.protobuf.BytesValue data = 1;
 }

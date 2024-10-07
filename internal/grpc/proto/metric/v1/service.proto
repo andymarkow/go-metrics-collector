@@ -4,8 +4,8 @@ option go_package = "github.com/andymarkow/go-metrics-collector/internal/grpc/ap
 
 package collector.metric.v1;
 
-import "metric_request.proto";
-import "metric_response.proto";
+import "request.proto";
+import "response.proto";
 
 service MetricService {
     rpc UpdateMetric (stream UpdateMetricRequest) returns (UpdateMetricResponse) {}

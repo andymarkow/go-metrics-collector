@@ -9,6 +9,7 @@ import (
 	pbv1 "github.com/andymarkow/go-metrics-collector/internal/grpc/api/metric/v1"
 )
 
+// MetricService represents a gRPC Metric service.
 type MetricService struct {
 	pbv1.UnimplementedMetricServiceServer
 
@@ -16,6 +17,7 @@ type MetricService struct {
 	storage storage.Storage
 }
 
+// NewMetricService returns a new MetricService instance.
 func NewMetricService(store storage.Storage, opts ...Option) *MetricService {
 	svc := &MetricService{
 		log:     zap.NewNop(),
@@ -29,8 +31,10 @@ func NewMetricService(store storage.Storage, opts ...Option) *MetricService {
 	return svc
 }
 
+// Option is a functional option type for MetricService.
 type Option func(*MetricService)
 
+// WithLogger sets the logger for the Metric service.
 func WithLogger(log *zap.Logger) Option {
 	return func(c *MetricService) {
 		c.log = log
