@@ -241,7 +241,7 @@ func (r *MetricReporter) sendRequest(metrics []models.Metrics) error {
 	if r.useGrpc {
 		r.log.Debug("sending metrics batch by grpc")
 
-		if err := r.sendByGRPC(ctx, payload); err != nil {
+		if err := r.sendByGRPC(ctx, hashsum, payload); err != nil {
 			return fmt.Errorf("sendByGRPC: %w", err)
 		}
 
@@ -250,7 +250,7 @@ func (r *MetricReporter) sendRequest(metrics []models.Metrics) error {
 
 	r.log.Debug("sending metrics batch by http")
 
-	if err := r.sendByHTTP(hashsum, payload); err != nil {
+	if err := r.sendByHTTP(ctx, hashsum, payload); err != nil {
 		return fmt.Errorf("sendByHTTP: %w", err)
 	}
 
@@ -258,8 +258,8 @@ func (r *MetricReporter) sendRequest(metrics []models.Metrics) error {
 }
 
 // sendByHTTP sends a request to the server by http.
-func (r *MetricReporter) sendByHTTP(hashsum string, payload []byte) error {
-	err := r.metricClient.UpdateMetrics(context.Background(), hashsum, payload)
+func (r *MetricReporter) sendByHTTP(ctx context.Context, hashsum string, payload []byte) error {
+	err := r.metricClient.UpdateMetrics(ctx, hashsum, payload)
 	if err != nil {
 		return fmt.Errorf("metricClient.UpdateMetrics: %w", err)
 	}
@@ -267,8 +267,8 @@ func (r *MetricReporter) sendByHTTP(hashsum string, payload []byte) error {
 	return nil
 }
 
-func (r *MetricReporter) sendByGRPC(ctx context.Context, payload []byte) error {
-	msg, err := r.grpcClient.UpdateMetricsV1(ctx, payload)
+func (r *MetricReporter) sendByGRPC(ctx context.Context, hashsum string, payload []byte) error {
+	msg, err := r.grpcClient.UpdateMetricsV1(ctx, hashsum, payload)
 	if err != nil {
 		return fmt.Errorf("grpcClient.UpdateMetricsV1: %w", err)
 	}

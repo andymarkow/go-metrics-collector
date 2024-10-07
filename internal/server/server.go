@@ -109,6 +109,7 @@ func NewServer() (*Server, error) {
 
 	msvcv1 := metricsvcv1.NewMetricService(store,
 		metricsvcv1.WithLogger(log),
+		metricsvcv1.WithSignKey([]byte(cfg.SignKey)),
 	)
 
 	grpcsrv := grpcserver.NewServer(

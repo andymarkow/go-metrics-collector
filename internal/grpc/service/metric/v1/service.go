@@ -15,6 +15,7 @@ type MetricService struct {
 
 	log     *zap.Logger
 	storage storage.Storage
+	signKey []byte
 }
 
 // NewMetricService returns a new MetricService instance.
@@ -38,5 +39,12 @@ type Option func(*MetricService)
 func WithLogger(log *zap.Logger) Option {
 	return func(c *MetricService) {
 		c.log = log
+	}
+}
+
+// WithSignKey sets the sign key for the Metric service.
+func WithSignKey(signKey []byte) Option {
+	return func(c *MetricService) {
+		c.signKey = signKey
 	}
 }

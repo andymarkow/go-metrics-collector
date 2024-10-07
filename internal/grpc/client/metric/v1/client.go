@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/encoding/gzip"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
@@ -104,9 +105,15 @@ func WithRateLimiter(rateLimiter *rate.Limiter) Option {
 }
 
 // UpdateMetricsV1 updates metrics.
-func (c *Client) UpdateMetricsV1(ctx context.Context, data []byte) (string, error) {
+func (c *Client) UpdateMetricsV1(ctx context.Context, hashsum string, data []byte) (string, error) {
 	if err := c.rateLimiter.Wait(ctx); err != nil {
 		return "", fmt.Errorf("rateLimiter.Wait: %w", err)
+	}
+
+	if hashsum != "" {
+		md := metadata.New(map[string]string{"hashsum": hashsum})
+
+		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
 	resp, err := c.client.UpdateMetrics(ctx, &pbv1.UpdateMetricsRequest{
