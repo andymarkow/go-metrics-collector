@@ -179,7 +179,6 @@ jobs:
 
       - name: "Code increment #6"
         if: |
-          github.head_ref == 'iter25' ||
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter6' ||
           github.head_ref == 'iter7' ||
@@ -202,7 +201,6 @@ jobs:
 
       - name: "Code increment #7"
         if: |
-          github.head_ref == 'iter25' ||
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter7' ||
           github.head_ref == 'iter8' ||
@@ -224,7 +222,6 @@ jobs:
 
       - name: "Code increment #8"
         if: |
-          github.head_ref == 'iter25' ||
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter8' ||
           github.head_ref == 'iter9' ||
@@ -245,7 +242,6 @@ jobs:
 
       - name: "Code increment #9"
         if: |
-          github.head_ref == 'iter25' ||
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter9' ||
           github.head_ref == 'iter10' ||
@@ -266,7 +262,6 @@ jobs:
 
       - name: "Code increment #10"
         if: |
-          github.head_ref == 'iter25' ||
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter10' ||
           github.head_ref == 'iter11' ||
@@ -286,7 +281,6 @@ jobs:
 
       - name: "Code increment #11"
         if: |
-          github.head_ref == 'iter25' ||
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter11' ||
           github.head_ref == 'iter12' ||
@@ -305,7 +299,6 @@ jobs:
 
       - name: "Code increment #12"
         if: |
-          github.head_ref == 'iter25' ||
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter12' ||
           github.head_ref == 'iter13' ||
@@ -323,7 +316,6 @@ jobs:
 
       - name: "Code increment #13"
         if: |
-          github.head_ref == 'iter25' ||
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter13' ||
           github.head_ref == 'iter14'
@@ -340,7 +332,6 @@ jobs:
 
       - name: "Code increment #14"
         if: |
-          github.head_ref == 'iter25' ||
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter14'
         run: |
@@ -357,7 +348,6 @@ jobs:
 
       - name: "Code increment #14 (race detection)"
         if: |
-          github.head_ref == 'iter25' ||
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter14'
         run: |
