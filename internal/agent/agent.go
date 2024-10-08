@@ -3,6 +3,7 @@ package agent
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
 	"os"
 	"os/signal"
@@ -12,9 +13,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/andymarkow/go-metrics-collector/internal/cryptutils"
 	"github.com/andymarkow/go-metrics-collector/internal/logger"
 	"github.com/andymarkow/go-metrics-collector/internal/monitor"
+	"github.com/andymarkow/go-metrics-collector/internal/tlsutils"
 )
 
 // Agent represents a metrics agent that collects and reports metrics.
@@ -38,9 +39,15 @@ func NewAgent() (*Agent, error) {
 		return nil, fmt.Errorf("logger.NewZapLogger: %w", err)
 	}
 
-	publicKey, err := cryptutils.LoadRSAPublicKey(cfg.CryptoKey)
-	if err != nil {
-		return nil, fmt.Errorf("cryptutils.LoadRSAPublicKey: %w", err)
+	var publicKey *rsa.PublicKey
+
+	if cfg.CryptoKey != "" {
+		log.Info("Loading crypto key " + cfg.CryptoKey)
+
+		publicKey, err = tlsutils.LoadRSAPublicKey(cfg.CryptoKey)
+		if err != nil {
+			return nil, fmt.Errorf("tlsutils.LoadRSAPublicKey: %w", err)
+		}
 	}
 
 	mon := monitor.NewMonitor(
@@ -51,6 +58,7 @@ func NewAgent() (*Agent, error) {
 		monitor.WithPollInterval(time.Duration(cfg.PollInterval)*time.Second),
 		monitor.WithReportInterval(time.Duration(cfg.ReportInterval)*time.Second),
 		monitor.WithRateLimit(cfg.RateLimit),
+		monitor.WithUseGrpc(cfg.UseGrpc),
 	)
 
 	return &Agent{
@@ -77,21 +85,7 @@ func (a *Agent) Start() error {
 	go func(wg *sync.WaitGroup) {
 		defer wg.Done()
 
-		a.monitor.RunCollector(ctx)
-	}(wg)
-
-	wg.Add(1)
-	go func(wg *sync.WaitGroup) {
-		defer wg.Done()
-
-		a.monitor.RunCollectorGopsutils(ctx)
-	}(wg)
-
-	wg.Add(1)
-	go func(wg *sync.WaitGroup) {
-		defer wg.Done()
-
-		a.monitor.RunReporter(ctx)
+		a.monitor.Run(ctx)
 	}(wg)
 
 	// Graceful shutdown by OS signals.

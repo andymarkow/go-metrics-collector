@@ -3,6 +3,7 @@ package router
 
 import (
 	"crypto/rsa"
+	"net"
 	_ "net/http/pprof" //nolint:gosec // Enable pprof debugger
 
 	"github.com/go-chi/chi/v5"
@@ -14,41 +15,44 @@ import (
 	"github.com/andymarkow/go-metrics-collector/internal/storage"
 )
 
-type routerOpts struct {
+type config struct {
 	logger        *zap.Logger
+	trustedSubnet *net.IPNet
 	cryptoPrivKey *rsa.PrivateKey
 	signKey       []byte
 }
 
 func NewRouter(store storage.Storage, opts ...Option) *chi.Mux {
-	rOpts := routerOpts{
+	cfg := &config{
 		logger:  zap.NewNop(),
 		signKey: make([]byte, 0),
 	}
 
 	for _, opt := range opts {
-		opt(&rOpts)
+		opt(cfg)
 	}
 
-	h := handlers.NewHandlers(store, handlers.WithLogger(rOpts.logger))
+	h := handlers.NewHandlers(store, handlers.WithLogger(cfg.logger))
 
 	r := chi.NewRouter()
 
 	mw := middlewares.New(
-		middlewares.WithLogger(rOpts.logger),
-		middlewares.WithSignKey(rOpts.signKey),
-		middlewares.WithCryptoPrivateKey(rOpts.cryptoPrivKey),
+		middlewares.WithLogger(cfg.logger),
+		middlewares.WithSignKey(cfg.signKey),
+		middlewares.WithCryptoPrivateKey(cfg.cryptoPrivKey),
+		middlewares.WithTrustedSubnet(cfg.trustedSubnet),
 	)
 
 	r.Use(
 		middleware.Recoverer,
 		middleware.StripSlashes,
 		mw.Logger,
+		mw.Whitelist,
 	)
 
 	var useHashSumValidator bool
 
-	if len(rOpts.signKey) > 0 {
+	if len(cfg.signKey) > 0 {
 		useHashSumValidator = true
 	}
 
@@ -73,8 +77,11 @@ func NewRouter(store storage.Storage, opts ...Option) *chi.Mux {
 	})
 
 	r.Group(func(r chi.Router) {
+		if cfg.cryptoPrivKey != nil {
+			r.Use(mw.Cryptography)
+		}
+
 		r.Use(mw.Compress)
-		r.Use(mw.Cryptography)
 
 		if useHashSumValidator {
 			r.Use(mw.HashSumValidator)
@@ -87,25 +94,32 @@ func NewRouter(store storage.Storage, opts ...Option) *chi.Mux {
 }
 
 // Option is a router option.
-type Option func(o *routerOpts)
+type Option func(c *config)
 
 // WithLogger is a router option that sets logger.
 func WithLogger(logger *zap.Logger) Option {
-	return func(o *routerOpts) {
-		o.logger = logger
+	return func(c *config) {
+		c.logger = logger
 	}
 }
 
 // WithSignKey is a router option that sets sign key.
 func WithSignKey(signKey []byte) Option {
-	return func(o *routerOpts) {
-		o.signKey = signKey
+	return func(c *config) {
+		c.signKey = signKey
 	}
 }
 
 // WithCryptoPrivateKey is a router option that sets decription RSA private key.
 func WithCryptoPrivateKey(key *rsa.PrivateKey) Option {
-	return func(o *routerOpts) {
-		o.cryptoPrivKey = key
+	return func(c *config) {
+		c.cryptoPrivKey = key
+	}
+}
+
+// WithTrustedSubnet is a router option that sets trusted subnet.
+func WithTrustedSubnet(subnet *net.IPNet) Option {
+	return func(c *config) {
+		c.trustedSubnet = subnet
 	}
 }

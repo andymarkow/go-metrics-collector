@@ -46,8 +46,21 @@ func (m *Middlewares) Logger(next http.Handler) http.Handler {
 			responseData:   responseData,
 		}
 
+		remoteAddr, err := getRemoteIPAddr(r)
+		if err != nil {
+			m.log.Error("failed to get remote address", zap.Error(err))
+		}
+
+		scheme := "http"
+
+		if r.TLS != nil {
+			scheme = "https"
+		}
+
 		defer func() {
 			m.log.Info("request",
+				zap.String("remote_addr", remoteAddr.String()),
+				zap.String("host", scheme+"://"+r.Host),
 				zap.String("uri", r.RequestURI),
 				zap.String("method", r.Method),
 				zap.Int("status", responseData.status),

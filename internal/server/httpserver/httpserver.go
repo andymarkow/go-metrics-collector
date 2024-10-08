@@ -74,7 +74,7 @@ func WithLogger(log *zap.Logger) Option {
 
 // Start starts the HTTP server.
 func (s *HTTPServer) Start() error {
-	s.log.Info("Starting HTTP server", zap.String("addr", s.server.Addr))
+	s.log.Info("Starting HTTP server", zap.String("address", s.server.Addr))
 
 	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server.ListenAndServe: %w", err)

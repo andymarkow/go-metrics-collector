@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/caarlos0/env"
 )
@@ -22,6 +21,7 @@ type config struct {
 	PollInterval   int    `env:"POLL_INTERVAL" json:"poll_interval"`
 	ReportInterval int    `env:"REPORT_INTERVAL" json:"report_interval"`
 	RateLimit      int    `env:"RATE_LIMIT" json:"rate_limit"`
+	UseGrpc        bool   `env:"USE_GRPC" json:"use_grpc"`
 }
 
 // newConfig creates a new config for agent.
@@ -36,6 +36,7 @@ func newConfig() (config, error) {
 	flag.IntVar(&cfg.PollInterval, "p", 0, "poll interval in seconds [env:POLL_INTERVAL]")
 	flag.IntVar(&cfg.ReportInterval, "r", 0, "report interval in seconds [env:REPORT_INTERVAL]")
 	flag.IntVar(&cfg.RateLimit, "l", 0, "the number of simultaneous outgoing requests to the server [env:RATE_LIMIT]")
+	flag.BoolVar(&cfg.UseGrpc, "grpc", false, "whether or not to use gRPC [env:USE_GRPC]")
 	flag.Parse()
 
 	// Highest precedence for environment variables.
@@ -46,12 +47,6 @@ func newConfig() (config, error) {
 	// Lowest precedence for configuration file.
 	if err := readConfigFile(cfg.ConfigFile, &cfg); err != nil {
 		return cfg, fmt.Errorf("readConfigFile: %w", err)
-	}
-
-	// Check if the URL does not start with "http://" or "https://".
-	if !strings.HasPrefix(cfg.ServerAddr, "http://") &&
-		!strings.HasPrefix(cfg.ServerAddr, "https://") {
-		cfg.ServerAddr = "http://" + cfg.ServerAddr
 	}
 
 	return cfg, nil
@@ -71,8 +66,6 @@ func readConfigFile(file string, cfg *config) error {
 
 	if cfg.CryptoKey == "" {
 		if fileCfg.CryptoKey == "" {
-			cfg.CryptoKey = "./tls/public.key"
-		} else {
 			cfg.CryptoKey = fileCfg.CryptoKey
 		}
 	}
@@ -119,6 +112,12 @@ func readConfigFile(file string, cfg *config) error {
 
 	if cfg.SignKey == "" {
 		cfg.SignKey = fileCfg.SignKey
+	}
+
+	if !cfg.UseGrpc {
+		if fileCfg.UseGrpc {
+			cfg.UseGrpc = fileCfg.UseGrpc
+		}
 	}
 
 	return nil

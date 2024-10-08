@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+option go_package = "github.com/andymarkow/go-metrics-collector/internal/grpc/api/metric/v1";
+
+package collector.metric.v1;
+
+import "status.proto";
+import "error.proto";
+
+message UpdateMetricsResponse {
+    Status status = 1;
+    Error error = 2;
+}

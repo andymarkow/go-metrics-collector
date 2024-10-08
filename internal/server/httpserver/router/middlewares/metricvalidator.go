@@ -6,7 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/andymarkow/go-metrics-collector/internal/errormsg"
-	"github.com/andymarkow/go-metrics-collector/internal/monitor"
+	"github.com/andymarkow/go-metrics-collector/internal/monitor/metrics"
 )
 
 // MetricValidator is a router middleware that validates metric name and type.
@@ -15,7 +15,7 @@ func (m *Middlewares) MetricValidator(next http.Handler) http.Handler {
 		metricType := chi.URLParam(r, "metricType")
 
 		switch metricType {
-		case string(monitor.MetricCounter), string(monitor.MetricGauge):
+		case string(metrics.MetricCounter), string(metrics.MetricGauge):
 		default:
 			http.Error(w, errormsg.ErrMetricInvalidType.Error(), http.StatusBadRequest)
 
